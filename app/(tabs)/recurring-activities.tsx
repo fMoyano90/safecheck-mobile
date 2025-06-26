@@ -302,14 +302,34 @@ export default function RecurringActivitiesScreen() {
 
   if (showForm && selectedActivity) {
     return (
-      <FormRenderer
-        template={selectedActivity}
-        onSubmit={handleSubmitForm}
-        onCancel={() => {
-          setShowForm(false);
-          setSelectedActivity(null);
-        }}
-      />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              setShowForm(false);
+              setSelectedActivity(null);
+            }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#0891B2" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Completar Actividad</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>{selectedActivity.name}</Text>
+          <Text style={styles.formDescription}>
+            Formulario para completar la actividad recurrente
+          </Text>
+          {/* Aquí iría el FormRenderer real cuando esté disponible */}
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={handleSubmitForm}
+          >
+            <Text style={styles.completeButtonText}>Completar Actividad</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
@@ -487,5 +507,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     fontStyle: 'italic',
+  },
+  backButton: {
+    padding: 8,
+  },
+  placeholder: {
+    width: 40,
+  },
+  formContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  formDescription: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  completeButton: {
+    backgroundColor: '#0891B2',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  completeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

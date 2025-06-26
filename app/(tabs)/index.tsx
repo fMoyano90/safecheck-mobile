@@ -1,10 +1,13 @@
-import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/auth-context';
+import { activitiesApi, type Activity } from '@/lib/api';
+import React, { useState, useEffect } from 'react';
 
-// Tipos
-type Activity = {
+// Tipos locales para el componente
+type LocalActivity = {
   id: number;
   time: string;
   title: string;
@@ -23,20 +26,55 @@ type QuickAction = {
   color: string;
 };
 
-// Datos maquetados para las actividades del día
-const todayActivities: Activity[] = [
-  { id: 1001, time: '09:00', title: 'Inspección de Seguridad Área A', location: 'Planta Principal', type: 'inspection', priority: 'high', status: 'pending' },
-  { id: 1002, time: '11:30', title: 'Capacitación en Uso de EPP', location: 'Sala de Conferencias', type: 'training', priority: 'medium', status: 'pending' },
-  { id: 1003, time: '14:00', title: 'Evaluación de Riesgos Proyecto X', location: 'Oficina Central', type: 'evaluation', priority: 'high', status: 'pending' },
-];
-
-const completedActivities: Activity[] = [
-  { id: 1005, time: '08:00', title: 'Revisión de Protocolos Matutinos', location: 'Área de Control', type: 'inspection', priority: 'medium', status: 'completed' },
-  { id: 1006, time: '12:00', title: 'Simulacro de Evacuación', location: 'Edificio Principal', type: 'training', priority: 'high', status: 'completed' }
-];
+// Función para convertir Activity del backend a LocalActivity para mostrar
+const convertToLocalActivity = (activity: Activity): LocalActivity => {
+  const assignedDate = new Date(activity.assignedDate);
+  const time = assignedDate.toLocaleTimeString('es-ES', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false 
+  });
+  
+  // Determinar el título basado en los templates
+  let title = 'Actividad';
+  if (activity.templates && activity.templates.length > 0) {
+    if (activity.templates.length === 1) {
+      title = activity.templates[0].name;
+    } else {
+      title = `${activity.templates[0].name} (+${activity.templates.length - 1} más)`;
+    }
+  }
+  
+  // Determinar tipo basado en la categoría del template
+  let type = 'task';
+  if (activity.templates && activity.templates.length > 0 && activity.templates[0].category) {
+    const categoryName = activity.templates[0].category.name.toLowerCase();
+    if (categoryName.includes('inspección') || categoryName.includes('inspection')) type = 'inspection';
+    else if (categoryName.includes('capacitación') || categoryName.includes('training')) type = 'training';
+    else if (categoryName.includes('evaluación') || categoryName.includes('evaluation')) type = 'evaluation';
+    else if (categoryName.includes('reunión') || categoryName.includes('meeting')) type = 'meeting';
+  }
+  
+  return {
+    id: activity.id,
+    time,
+    title,
+    location: activity.contract?.name || 'Ubicación no especificada',
+    type,
+    priority: activity.priority,
+    status: activity.status,
+  };
+};
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
+  const [todayActivities, setTodayActivities] = useState<LocalActivity[]>([]);
+  const [completedActivities, setCompletedActivities] = useState<LocalActivity[]>([]);
+  const [upcomingActivities, setUpcomingActivities] = useState<Activity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  
   const currentDate = new Date();
   const dateString = currentDate.toLocaleDateString('es-ES', { 
     weekday: 'long', 
@@ -44,6 +82,92 @@ export default function HomeScreen() {
     month: 'long', 
     day: 'numeric' 
   });
+
+  // Determinar el saludo según la hora
+  const getGreeting = () => {
+    const hour = currentDate.getHours();
+    if (hour < 12) return 'Buenos días';
+    if (hour < 18) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
+
+  // Obtener el nombre del usuario
+  const getUserName = () => {
+    if (!user) return 'Usuario';
+    
+    const firstName = user.firstName || '';
+    const lastName = user.lastName || '';
+    
+    // Si tiene ambos nombres, usar solo el primer nombre
+    if (firstName && lastName) {
+      return firstName;
+    }
+    
+    // Si solo tiene uno, usar ese
+    if (firstName) return firstName;
+    if (lastName) return lastName;
+    
+    // Si no tiene nombres, extraer del email
+    if (user.email) {
+      const emailName = user.email.split('@')[0];
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+    }
+    
+    return 'Usuario';
+  };
+
+  // Cargar actividades cuando el usuario esté autenticado
+  useEffect(() => {
+    if (user && !isLoading) {
+      loadActivities();
+    }
+  }, [user, isLoading]);
+
+  const loadActivities = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingActivities(true);
+      
+      // Cargar actividades en paralelo
+      const [upcomingActivities, todayCompleted] = await Promise.all([
+        activitiesApi.getUpcoming().then(activities => 
+          activities.filter(a => a.status === 'pending')
+        ),
+        activitiesApi.getTodayCompleted(),
+      ]);
+      
+      // Convertir las actividades próximas a formato local para mostrar
+      setTodayActivities(upcomingActivities.map(convertToLocalActivity));
+      setCompletedActivities(todayCompleted.map(convertToLocalActivity));
+      setUpcomingActivities(upcomingActivities);
+      
+    } catch (error) {
+      console.error('Error loading activities:', error);
+      // En caso de error, mostrar datos vacíos pero no fallar la app
+      setTodayActivities([]);
+      setCompletedActivities([]);
+      setUpcomingActivities([]);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadActivities();
+    setRefreshing(false);
+  };
+
+  // Mostrar loading si aún se están cargando los datos del usuario
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0891B2" />
+        <Text style={styles.loadingText}>Cargando dashboard...</Text>
+      </View>
+    );
+  }
 
   // Actividades recurrentes más utilizadas
   const frequentActivities = [
@@ -128,11 +252,19 @@ export default function HomeScreen() {
   const completedCount = completedActivities.length;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {/* Header */}
       <View style={styles.homeHeader}>
-        <Text style={styles.greeting}>¡Buenos días, Juan Carlos!</Text>
+        <Text style={styles.greeting}>¡{getGreeting()}, {getUserName()}!</Text>
         <Text style={styles.dateText}>{dateString}</Text>
+        {user?.role && (
+          <Text style={styles.roleText}>{user.role}</Text>
+        )}
       </View>
 
       {/* Estadísticas del día */}
@@ -217,43 +349,95 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Próximas Actividades</Text>
         </View>
         
-        {todayActivities.slice(0, 3).map((activity) => (
-          <TouchableOpacity 
-            key={activity.id} 
-            style={styles.homeActivityCard}
-            onPress={() => router.push('/scheduled')}
-          >
-            <View style={styles.homeActivityHeader}>
-              <View style={styles.activityTime}>
-                <Text style={styles.timeText}>{activity.time}</Text>
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>{activity.title}</Text>
-                <View style={styles.activityDetails}>
-                  <FontAwesome name="map-marker" size={12} color="#666" />
-                  <Text style={styles.locationText}>{activity.location}</Text>
-                </View>
-              </View>
-              <View style={styles.activityIcons}>
-                <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(activity.priority) }]} />
-                <FontAwesome 
-                  name={getActivityIcon(activity.type)} 
-                  size={16} 
-                  color={getActivityColor(activity.type)} 
-                />
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-        
-        {todayActivities.length > 3 && (
-          <TouchableOpacity 
-            style={styles.viewAllButton}
-            onPress={() => router.push('/scheduled')}
-          >
-            <Text style={styles.viewAllText}>Ver todas las actividades programadas</Text>
-            <FontAwesome name="arrow-right" size={14} color="#0891B2" />
-          </TouchableOpacity>
+        {loadingActivities ? (
+          <View style={styles.activityLoadingContainer}>
+            <ActivityIndicator size="small" color="#0891B2" />
+            <Text style={styles.activityLoadingText}>Cargando actividades...</Text>
+          </View>
+        ) : todayActivities.length > 0 ? (
+          <>
+            {/* Mostrar actividades próximas organizadas por día */}
+            {todayActivities.slice(0, 5).map((activity, index) => {
+              // Determinar si es hoy, mañana o futuro
+              const activityDate = new Date(upcomingActivities[index]?.assignedDate);
+              const today = new Date();
+              const tomorrow = new Date(today);
+              tomorrow.setDate(today.getDate() + 1);
+              
+              let dateLabel = '';
+              let additionalStyle = {};
+              
+              if (activityDate.toDateString() === today.toDateString()) {
+                dateLabel = 'Hoy';
+                additionalStyle = styles.todayActivity;
+              } else if (activityDate.toDateString() === tomorrow.toDateString()) {
+                dateLabel = 'Mañana';
+                additionalStyle = styles.tomorrowActivity;
+              } else {
+                dateLabel = activityDate.toLocaleDateString('es-ES', { 
+                  weekday: 'short', 
+                  day: 'numeric',
+                  month: 'short'
+                });
+                additionalStyle = styles.futureActivity;
+              }
+              
+              return (
+                <TouchableOpacity 
+                  key={activity.id} 
+                  style={[styles.homeActivityCard, additionalStyle]}
+                  onPress={() => router.push('/scheduled')}
+                >
+                  <View style={styles.homeActivityHeader}>
+                    <View style={styles.activityTimeWithDate}>
+                      <Text style={styles.dateLabel}>{dateLabel}</Text>
+                      <Text style={styles.timeText}>{activity.time}</Text>
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <View style={styles.activityDetails}>
+                        <FontAwesome 
+                          name={getActivityIcon(activity.type)} 
+                          size={12} 
+                          color={getActivityColor(activity.type)} 
+                        />
+                        <Text style={styles.locationText}>{activity.location}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.activityIcons}>
+                      <View 
+                        style={[
+                          styles.priorityIndicator, 
+                          { backgroundColor: getPriorityColor(activity.priority) }
+                        ]} 
+                      />
+                      <FontAwesome name="chevron-right" size={14} color="#ccc" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => router.push('/scheduled')}
+            >
+              <Text style={styles.viewAllText}>Ver todas las programadas</Text>
+              <FontAwesome name="arrow-right" size={12} color="#0891B2" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <FontAwesome name="calendar-o" size={48} color="#94A3B8" />
+            <Text style={styles.emptyStateTitle}>No hay actividades próximas</Text>
+            <Text style={styles.emptyStateText}>Revisa tus actividades programadas o realiza actividades recurrentes</Text>
+            <TouchableOpacity 
+              style={styles.emptyStateButton}
+              onPress={() => router.push('/recurring-activities')}
+            >
+              <Text style={styles.emptyStateButtonText}>Ver Actividades Recurrentes</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -518,5 +702,100 @@ const styles = StyleSheet.create({
     color: '#0891B2',
     fontWeight: '500',
     marginRight: 6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+  },
+  roleText: {
+    fontSize: 14,
+    color: '#0891B2',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  activityLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 8,
+  },
+  activityLoadingText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  tomorrowSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  tomorrowTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 8,
+    paddingHorizontal: 15,
+  },
+  tomorrowActivity: {
+    backgroundColor: '#f8fafc',
+  },
+  todayActivity: {
+    backgroundColor: '#fff7ed',
+    borderLeftWidth: 3,
+    borderLeftColor: '#f59e0b',
+  },
+  futureActivity: {
+    backgroundColor: '#f1f5f9',
+  },
+  activityTimeWithDate: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginRight: 15,
+    alignItems: 'center',
+  },
+  dateLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#0891B2',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  emptyStateButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
