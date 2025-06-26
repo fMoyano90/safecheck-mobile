@@ -48,17 +48,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="recurring-activities"
         options={{
-          title: 'Calendario',
+          title: 'Recurrentes',
+          tabBarIcon: ({ color }) => <TabBarIcon name="repeat" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scheduled"
+        options={{
+          title: 'Programadas',
           tabBarIcon: ({ color }) => <TabBarIcon name="calendar" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="agenda"
+        name="history"
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ color }) => <TabBarIcon name="list-ul" color={color} />,
+          title: 'Historial',
+          tabBarIcon: ({ color }) => <TabBarIcon name="history" color={color} />,
         }}
       />
     </Tabs>
