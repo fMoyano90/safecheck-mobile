@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { ApiError } from '@/lib/api';
+import Logo from '@/components/ui/Logo';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -91,10 +92,9 @@ export default function LoginScreen() {
       >
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
-              <Ionicons name="shield-checkmark" size={48} color="#0891B2" />
-            </View>
-            <Text style={styles.appTitle}>SafetyTech</Text>
+                          <View style={styles.logoWrapper}>
+                <Logo width={180} height={80} />
+              </View>
             <Text style={styles.appSubtitle}>Gestión de Seguridad Industrial</Text>
           </View>
         </View>
@@ -105,11 +105,11 @@ export default function LoginScreen() {
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#64748B" style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color="#737373" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor="#a3a3a3"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -119,11 +119,11 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#64748B" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color="#737373" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Contraseña"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor="#a3a3a3"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -137,7 +137,7 @@ export default function LoginScreen() {
                 <Ionicons 
                   name={showPassword ? "eye-outline" : "eye-off-outline"} 
                   size={20} 
-                  color="#64748B" 
+                  color="#737373" 
                 />
               </TouchableOpacity>
             </View>
@@ -173,7 +173,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f5f5', // neutral-50
   },
   keyboardContainer: {
     flex: 1,
@@ -187,24 +187,14 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E0F2FE',
+  logoWrapper: {
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
   },
-  appTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
+ 
   appSubtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     textAlign: 'center',
   },
   formContainer: {
@@ -215,13 +205,13 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 8,
     textAlign: 'center',
   },
   welcomeSubtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -251,7 +241,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1e293b',
+    color: '#505759', // neutral-800
   },
   eyeIcon: {
     padding: 4,
@@ -262,11 +252,11 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#0891B2',
+    color: '#1565c0', // blue-500
     fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: '#0891B2',
+    backgroundColor: '#ff6d00', // brand-500
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -280,7 +270,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   loginButtonDisabled: {
-    backgroundColor: '#94A3B8',
+    backgroundColor: '#a3a3a3', // neutral-400
   },
   loginButtonText: {
     color: 'white',
@@ -294,7 +284,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     textAlign: 'center',
   },
 }); 

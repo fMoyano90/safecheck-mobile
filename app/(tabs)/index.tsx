@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { activitiesApi, type Activity, recurringActivitiesApi, type RecurringActivity } from '@/lib/api';
 import React, { useState, useEffect } from 'react';
 import FormButton from '@/components/activities/FormButton';
+import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
 
 // Tipos locales para el componente
 type LocalActivity = {
@@ -108,6 +109,8 @@ export default function HomeScreen() {
   const [recurringActivities, setRecurringActivities] = useState<RecurringActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
   
   const currentDate = new Date();
   const dateString = currentDate.toLocaleDateString('es-ES', { 
@@ -196,6 +199,37 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
+  const handleActivityPress = (localActivity: LocalActivity) => {
+    // Encontrar la actividad completa en upcomingActivities
+    const fullActivity = upcomingActivities.find(a => a.id === localActivity.id);
+    if (fullActivity) {
+      // Convertir a formato del modal (simulando templates con estados)
+      const activityForModal = {
+        ...fullActivity,
+        templates: fullActivity.templates?.map(template => ({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          status: 'pending' as const, // Por ahora todos pendientes
+        })) || [],
+      };
+      
+      setSelectedActivity(activityForModal);
+      setModalVisible(true);
+    }
+  };
+
+  const handleCompleteActivity = async (activityId: number) => {
+    try {
+      await activitiesApi.complete(activityId, { formData: {} });
+      Alert.alert('Éxito', 'Actividad marcada como completada');
+      await loadActivities(); // Recargar datos
+    } catch (error) {
+      console.error('Error completing activity:', error);
+      throw error;
+    }
+  };
+
   // Mostrar loading si aún se están cargando los datos del usuario
   if (isLoading) {
     return (
@@ -221,7 +255,7 @@ export default function HomeScreen() {
       description: 'Ver formularios disponibles',
       icon: 'repeat',
       route: '/recurring-activities',
-      color: '#9C27B0',
+      color: '#ff6d00', // brand-500
     },
     {
       id: 'scheduled',
@@ -229,7 +263,7 @@ export default function HomeScreen() {
       description: 'Ver agenda y calendario',
       icon: 'calendar',
       route: '/scheduled',
-      color: '#2196F3',
+      color: '#1565c0', // blue-500
     },
     {
       id: 'history',
@@ -237,7 +271,7 @@ export default function HomeScreen() {
       description: 'Actividades completadas',
       icon: 'history',
       route: '/history',
-      color: '#4CAF50',
+      color: '#42a5f5', // blue-400
     },
   ];
 
@@ -259,28 +293,28 @@ export default function HomeScreen() {
   const getActivityColor = (type: string) => {
     switch (type) {
       case 'inspection':
-        return '#2196F3';
+        return '#1565c0'; // blue-500
       case 'training':
-        return '#9C27B0';
+        return '#1976d2'; // blue-700
       case 'evaluation':
-        return '#FF5722';
+        return '#ff834d'; // brand-400
       case 'meeting':
-        return '#4CAF50';
+        return '#42a5f5'; // blue-400
       default:
-        return '#9E9E9E';
+        return '#737373'; // neutral-500
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return '#F44336';
+        return '#cc5200'; // brand-700
       case 'medium':
-        return '#FF9800';
+        return '#ff6d00'; // brand-500
       case 'low':
-        return '#4CAF50';
+        return '#1565c0'; // blue-500
       default:
-        return '#9E9E9E';
+        return '#737373'; // neutral-500
     }
   };
 
@@ -289,11 +323,12 @@ export default function HomeScreen() {
   const completedCount = completedActivities.length;
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+    <>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
     >
       {/* Header */}
       <View style={styles.homeHeader}>
@@ -311,11 +346,11 @@ export default function HomeScreen() {
           <Text style={styles.statLabel}>Total del día</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#FF9800' }]}>{pendingActivities}</Text>
+          <Text style={[styles.statNumber, { color: '#ff6d00' }]}>{pendingActivities}</Text>
           <Text style={styles.statLabel}>Pendientes</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#4CAF50' }]}>{completedCount}</Text>
+          <Text style={[styles.statNumber, { color: '#1565c0' }]}>{completedCount}</Text>
           <Text style={styles.statLabel}>Completadas</Text>
         </View>
       </View>
@@ -323,7 +358,7 @@ export default function HomeScreen() {
       {/* Acciones rápidas */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <FontAwesome name="bolt" size={20} color="#FF6B35" />
+          <FontAwesome name="bolt" size={20} color="#ff6d00" />
           <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
         </View>
         
@@ -341,7 +376,7 @@ export default function HomeScreen() {
                 <Text style={styles.quickActionTitle}>{action.title}</Text>
                 <Text style={styles.quickActionDescription}>{action.description}</Text>
               </View>
-              <FontAwesome name="chevron-right" size={16} color="#94A3B8" />
+              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
             </TouchableOpacity>
           ))}
         </View>
@@ -350,13 +385,13 @@ export default function HomeScreen() {
       {/* Actividades recurrentes */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <FontAwesome name="refresh" size={20} color="#FF9800" />
+          <FontAwesome name="refresh" size={20} color="#ff6d00" />
           <Text style={styles.sectionTitle}>Actividades Recurrentes</Text>
         </View>
         
         {loadingActivities ? (
           <View style={styles.activityLoadingContainer}>
-            <ActivityIndicator size="small" color="#0891B2" />
+            <ActivityIndicator size="small" color="#ff6d00" />
             <Text style={styles.activityLoadingText}>Cargando actividades recurrentes...</Text>
           </View>
         ) : recurringActivities.length > 0 ? (
@@ -364,9 +399,29 @@ export default function HomeScreen() {
             {recurringActivities.slice(0, 3).map((recurringActivity) => {
               const localActivity = convertRecurringToLocalActivity(recurringActivity);
               return (
-                <View 
+                <TouchableOpacity 
                   key={recurringActivity.id} 
                   style={[styles.homeActivityCard, styles.recurringActivityCard]}
+                  onPress={() => {
+                    // Para actividades recurrentes, crear un objeto similar al modal
+                    const activityForModal = {
+                      id: recurringActivity.id,
+                      assignedDate: recurringActivity.assignedDate,
+                      dueDate: new Date(Date.now() + 24*60*60*1000).toISOString(), // Mañana
+                      status: recurringActivity.status === 'active' ? 'pending' : 'completed',
+                      priority: 'medium',
+                      assignedBy: recurringActivity.assignedBy,
+                      templates: recurringActivity.template ? [{
+                        id: recurringActivity.template.id,
+                        name: recurringActivity.template.name,
+                        description: recurringActivity.template.description,
+                        status: 'pending' as const,
+                      }] : [],
+                      observations: `Actividad recurrente - Completada ${recurringActivity.completionCount} veces`,
+                    };
+                    setSelectedActivity(activityForModal);
+                    setModalVisible(true);
+                  }}
                 >
                   <View style={styles.homeActivityHeader}>
                     <View style={styles.activityTime}>
@@ -398,16 +453,16 @@ export default function HomeScreen() {
                       />
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
             
             <TouchableOpacity 
-              style={styles.viewAllButton}
+              style={styles.viewAllButtonOrange}
               onPress={() => router.push('/recurring-activities')}
             >
-              <Text style={styles.viewAllText}>Ver todas las actividades recurrentes</Text>
-              <FontAwesome name="arrow-right" size={12} color="#0891B2" />
+              <Text style={styles.viewAllTextOrange}>Ver todas las actividades recurrentes</Text>
+              <FontAwesome name="arrow-right" size={12} color="#ff6d00" />
             </TouchableOpacity>
           </>
         ) : (
@@ -422,13 +477,13 @@ export default function HomeScreen() {
       {/* Próximas actividades */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <FontAwesome name="clock-o" size={20} color="#2196F3" />
+          <FontAwesome name="clock-o" size={20} color="#1565c0" />
           <Text style={styles.sectionTitle}>Próximas Actividades</Text>
         </View>
         
         {loadingActivities ? (
           <View style={styles.activityLoadingContainer}>
-            <ActivityIndicator size="small" color="#0891B2" />
+            <ActivityIndicator size="small" color="#ff6d00" />
             <Text style={styles.activityLoadingText}>Cargando actividades...</Text>
           </View>
         ) : todayActivities.length > 0 ? (
@@ -463,7 +518,7 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={activity.id} 
                   style={[styles.homeActivityCard, additionalStyle]}
-                  onPress={() => router.push('/scheduled')}
+                  onPress={() => handleActivityPress(activity)}
                 >
                   <View style={styles.homeActivityHeader}>
                     <View style={styles.activityTimeWithDate}>
@@ -500,7 +555,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/scheduled')}
             >
               <Text style={styles.viewAllText}>Ver todas las programadas</Text>
-              <FontAwesome name="arrow-right" size={12} color="#0891B2" />
+              <FontAwesome name="arrow-right" size={12} color="#0066cc" />
             </TouchableOpacity>
           </>
         ) : (
@@ -551,11 +606,21 @@ export default function HomeScreen() {
             onPress={() => router.push('/history')}
           >
             <Text style={styles.viewAllText}>Ver historial completo</Text>
-            <FontAwesome name="arrow-right" size={14} color="#0891B2" />
+            <FontAwesome name="arrow-right" size={14} color="#0066cc" />
           </TouchableOpacity>
         )}
       </View>
     </ScrollView>
+
+    {/* Modal de detalles de actividad */}
+    <ActivityDetailsModal
+      visible={modalVisible}
+      onClose={() => setModalVisible(false)}
+      activity={selectedActivity}
+      onCompleteActivity={handleCompleteActivity}
+      onRefresh={loadActivities}
+    />
+    </>
   );
 }
 
@@ -573,12 +638,12 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'black',
+    color: '#505759', // neutral-800
     marginBottom: 5,
   },
   dateText: {
     fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.8)',
+    color: '#737373', // neutral-500
     textTransform: 'capitalize',
   },
   statsContainer: {
@@ -604,11 +669,11 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2196F3',
+    color: '#1565c0', // blue-500
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: '#737373', // neutral-500
     marginTop: 5,
     textAlign: 'center',
   },
@@ -635,7 +700,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#505759', // neutral-800
     marginLeft: 10,
   },
   homeActivityCard: {
@@ -660,7 +725,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#505759', // neutral-800
   },
   activityContent: {
     flex: 1,
@@ -668,7 +733,7 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#505759', // neutral-800
     marginBottom: 5,
   },
   activityDetails: {
@@ -677,7 +742,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    color: '#666',
+    color: '#737373', // neutral-500
     marginLeft: 5,
   },
   activityIcons: {
@@ -727,16 +792,16 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 2,
   },
   quickActionDescription: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
   },
   recurringActivityCard: {
     borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
+    borderLeftColor: '#ff6d00', // brand-500
   },
 
   recurringActivityContent: {
@@ -745,25 +810,25 @@ const styles = StyleSheet.create({
   recurringActivityTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 2,
   },
   recurringActivityStatus: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#737373', // neutral-500
   },
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#f0f8ff', // Azul muy claro
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
   },
   viewAllText: {
     fontSize: 14,
-    color: '#0891B2',
+    color: '#0066cc', // Azul SafetyTech
     fontWeight: '500',
     marginRight: 6,
   },
@@ -771,16 +836,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f5f5', // neutral-50
     gap: 16,
   },
   loadingText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#737373', // neutral-500
   },
   roleText: {
     fontSize: 14,
-    color: '#0891B2',
+    color: '#1565c0', // blue-500
     fontWeight: '500',
     marginTop: 4,
   },
@@ -793,7 +858,7 @@ const styles = StyleSheet.create({
   },
   activityLoadingText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
   },
   tomorrowSection: {
     marginTop: 16,
@@ -804,7 +869,7 @@ const styles = StyleSheet.create({
   tomorrowTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginBottom: 8,
     paddingHorizontal: 15,
   },
@@ -812,9 +877,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   todayActivity: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#fff5f0', // brand-50
     borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: '#ff6d00', // brand-500
   },
   futureActivity: {
     backgroundColor: '#f1f5f9',
@@ -830,7 +895,7 @@ const styles = StyleSheet.create({
   dateLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#737373', // neutral-500
     textTransform: 'uppercase',
   },
   emptyStateContainer: {
@@ -841,17 +906,17 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#737373', // neutral-500
     textAlign: 'center',
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#a3a3a3', // neutral-400
     textAlign: 'center',
     lineHeight: 20,
   },
   emptyStateButton: {
-    backgroundColor: '#0891B2',
+    backgroundColor: '#ff6d00', // brand-500
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -864,7 +929,7 @@ const styles = StyleSheet.create({
   },
   completionCount: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginTop: 4,
     fontStyle: 'italic',
   },
@@ -872,5 +937,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  viewAllButtonOrange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff5f0', // Naranja muy claro
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  viewAllTextOrange: {
+    fontSize: 14,
+    color: '#ff6d00', // Naranja SafetyTech
+    fontWeight: '500',
+    marginRight: 6,
   },
 });

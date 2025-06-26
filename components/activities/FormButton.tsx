@@ -83,12 +83,12 @@ const FormButton: React.FC<FormButtonProps> = ({
   };
 
   const getIconColor = () => {
-    if (disabled) return '#9CA3AF';
+    if (disabled) return '#a3a3a3'; // neutral-400
     
     switch (variant) {
       case 'primary': return '#FFFFFF';
       case 'secondary': return '#FFFFFF';
-      case 'outline': return '#0891B2';
+      case 'outline': return '#ff6d00'; // brand-500
       default: return '#FFFFFF';
     }
   };
@@ -137,20 +137,20 @@ const styles = StyleSheet.create({
   
   // Variantes
   primary: {
-    backgroundColor: '#0891B2',
+    backgroundColor: '#ff6d00', // brand-500
   },
   secondary: {
-    backgroundColor: '#6B7280',
+    backgroundColor: '#1565c0', // blue-500
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#0891B2',
+    borderColor: '#ff6d00', // brand-500
   },
   
   // Estado deshabilitado
   disabled: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#e5e5e5', // neutral-200
   },
   
   // Textos
@@ -175,10 +175,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   outlineText: {
-    color: '#0891B2',
+    color: '#ff6d00', // brand-500
   },
   disabledText: {
-    color: '#9CA3AF',
+    color: '#a3a3a3', // neutral-400
   },
 });
 

@@ -8,11 +8,31 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar } from 'react-native-calendars';
-import { activitiesApi, type Activity } from '@/lib/api';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { activitiesApi, type Activity, documentsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
+import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
+
+// Configurar localización en español
+LocaleConfig.locales['es'] = {
+  monthNames: [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ],
+  monthNamesShort: [
+    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+  ],
+  dayNames: [
+    'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+  ],
+  dayNamesShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  today: 'Hoy'
+};
+LocaleConfig.defaultLocale = 'es';
 
 interface ScheduledActivity {
   id: number;
@@ -36,9 +56,22 @@ export default function ScheduledActivitiesScreen() {
   const { user, isLoading } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('agenda');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  // Usar fecha local para evitar problemas de zona horaria
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<any>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [rawActivities, setRawActivities] = useState<Activity[]>([]);
+
+  // Función helper para crear fecha local desde string YYYY-MM-DD
+  const createLocalDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // month - 1 porque los meses en JS van de 0-11
+  };
 
   // Función para convertir Activity del backend a ScheduledActivity
   const convertToScheduledActivity = (activity: Activity): ScheduledActivity => {
@@ -48,18 +81,30 @@ export default function ScheduledActivitiesScreen() {
       minute: '2-digit',
       hour12: false 
     });
-    const date = assignedDate.toISOString().split('T')[0];
+    // Usar la fecha local en lugar de UTC para evitar desfases de zona horaria
+    const date = `${assignedDate.getFullYear()}-${String(assignedDate.getMonth() + 1).padStart(2, '0')}-${String(assignedDate.getDate()).padStart(2, '0')}`;
     
     // Título basado en los templates
     let title = 'Actividad';
     let templates: string[] = [];
+    
+    // Verificar si tenemos templates expandidos o solo templateIds
     if (activity.templates && activity.templates.length > 0) {
+      // Templates expandidos
       if (activity.templates.length === 1) {
         title = activity.templates[0].name;
       } else {
         title = `${activity.templates[0].name} (+${activity.templates.length - 1} más)`;
       }
       templates = activity.templates.map(t => t.name);
+    } else if (activity.templateIds && activity.templateIds.length > 0) {
+      // Solo templateIds, crear nombres genéricos
+      if (activity.templateIds.length === 1) {
+        title = `Formulario ${activity.templateIds[0]}`;
+      } else {
+        title = `${activity.templateIds.length} Formularios`;
+      }
+      templates = activity.templateIds.map(id => `Formulario ${id}`);
     }
     
     // Determinar tipo basado en la categoría del template
@@ -70,6 +115,9 @@ export default function ScheduledActivitiesScreen() {
       else if (categoryName.includes('capacitación') || categoryName.includes('training')) type = 'training';
       else if (categoryName.includes('evaluación') || categoryName.includes('evaluation')) type = 'evaluation';
       else if (categoryName.includes('reunión') || categoryName.includes('meeting')) type = 'meeting';
+    } else if (activity.templateIds && activity.templateIds.length > 0) {
+      // Si solo tenemos templateIds, usar tipo genérico
+      type = 'calendar';
     }
     
     return {
@@ -102,6 +150,9 @@ export default function ScheduledActivitiesScreen() {
       // Cargar todas las actividades del usuario
       const userActivities = await activitiesApi.getMyActivities();
       
+      // Guardar actividades sin procesar para el modal
+      setRawActivities(userActivities);
+      
       // Convertir a formato ScheduledActivity y ordenar por fecha
       const scheduledActivities = userActivities
         .map(convertToScheduledActivity)
@@ -122,6 +173,61 @@ export default function ScheduledActivitiesScreen() {
     setRefreshing(false);
   };
 
+  const handleActivityPress = async (scheduledActivity: ScheduledActivity) => {
+    // Encontrar la actividad completa en rawActivities
+    const fullActivity = rawActivities.find(a => a.id === scheduledActivity.id);
+    if (fullActivity) {
+
+      
+      // Cargar los templates usando los templateIds
+      let templates: Array<{id: number, name: string, description: string, status: 'pending'}> = [];
+      if (fullActivity.templateIds && fullActivity.templateIds.length > 0) {
+        try {
+          // Obtener el template real del primer templateId
+          const templateData = await documentsApi.getActivityTemplate(fullActivity.id);
+          
+          templates = fullActivity.templateIds.map((templateId, index) => ({
+            id: templateId,
+            name: index === 0 ? templateData.name : `Template ${templateId}`,
+            description: index === 0 ? (templateData.description || 'Formulario asignado a esta actividad') : 'Formulario asignado a esta actividad',
+            status: 'pending' as const,
+          }));
+        } catch (error) {
+          console.error('Error cargando template:', error);
+          // Fallback: usar los nombres que ya tenemos
+          templates = fullActivity.templateIds.map((templateId, index) => ({
+            id: templateId,
+            name: scheduledActivity.templates?.[index] || scheduledActivity.title || `Template ${templateId}`,
+            description: 'Formulario asignado a esta actividad',
+            status: 'pending' as const,
+          }));
+        }
+      }
+      
+      // Convertir a formato del modal
+      const activityForModal = {
+        ...fullActivity,
+        templates: templates,
+      };
+      
+
+      
+      setSelectedActivity(activityForModal);
+      setModalVisible(true);
+    }
+  };
+
+  const handleCompleteActivity = async (activityId: number) => {
+    try {
+      await activitiesApi.complete(activityId, { formData: {} });
+      Alert.alert('Éxito', 'Actividad marcada como completada');
+      await loadActivities(); // Recargar datos
+    } catch (error) {
+      console.error('Error completing activity:', error);
+      throw error;
+    }
+  };
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'inspection': return 'search';
@@ -134,36 +240,42 @@ export default function ScheduledActivitiesScreen() {
 
   const getActivityColor = (type: string) => {
     switch (type) {
-      case 'inspection': return '#2196F3';
-      case 'training': return '#9C27B0';
-      case 'evaluation': return '#FF5722';
-      case 'meeting': return '#4CAF50';
-      default: return '#9E9E9E';
+      case 'inspection': return '#1565c0'; // blue-500
+      case 'training': return '#1976d2'; // blue-700
+      case 'evaluation': return '#ff834d'; // brand-400
+      case 'meeting': return '#42a5f5'; // blue-400
+      default: return '#737373'; // neutral-500
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return '#F44336';
-      case 'medium': return '#FF9800';
-      case 'low': return '#4CAF50';
-      default: return '#9E9E9E';
+      case 'urgent': return '#DC2626'; // Rojo urgente
+      case 'high': return '#EF4444';   // Rojo alto
+      case 'medium': return '#ff6d00'; // Naranja SafetyTech
+      case 'low': return '#10B981';    // Verde bajo
+      default: return '#6B7280';       // Gris por defecto
+    }
+  };
+
+  const getPriorityText = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'URGENTE';
+      case 'high': return 'ALTA';
+      case 'medium': return 'MEDIA';
+      case 'low': return 'BAJA';
+      default: return priority.toUpperCase();
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
-      case 'approved':
-        return '#4CAF50';
-      case 'rejected':
-        return '#F44336';
-      case 'overdue':
-        return '#FF5722';
-      case 'pending':
-        return '#2196F3';
-      default:
-        return '#9E9E9E';
+      case 'pending': return '#ff6d00';
+      case 'completed': return '#10B981';
+      case 'approved': return '#059669';
+      case 'rejected': return '#EF4444';
+      case 'overdue': return '#DC2626';
+      default: return '#6B7280';
     }
   };
 
@@ -172,34 +284,49 @@ export default function ScheduledActivitiesScreen() {
   };
 
   const getMarkedDates = () => {
-    const marked: any = {};
-    activities.forEach(activity => {
-      marked[activity.date] = {
-        marked: true,
-        dotColor: getActivityColor(activity.type),
-      };
-    });
+    const marked: { [key: string]: any } = {};
     
+    activities.forEach(activity => {
+      const dateKey = activity.date;
+      if (!marked[dateKey]) {
+        marked[dateKey] = { dots: [] };
+      }
+      
+      // Agregar punto basado en la prioridad
+      const priorityColor = getPriorityColor(activity.priority);
+      marked[dateKey].dots.push({
+        color: priorityColor,
+        selectedDotColor: 'white',
+      });
+    });
+
     // Marcar la fecha seleccionada
     if (marked[selectedDate]) {
       marked[selectedDate].selected = true;
-      marked[selectedDate].selectedColor = '#0891B2';
+      marked[selectedDate].selectedColor = '#ff6d00';
     } else {
       marked[selectedDate] = {
         selected: true,
-        selectedColor: '#0891B2',
+        selectedColor: '#ff6d00',
       };
     }
-    
+
     return marked;
   };
 
   const renderActivityCard = (activity: ScheduledActivity) => (
-    <TouchableOpacity key={activity.id} style={styles.activityCard}>
+    <TouchableOpacity 
+      key={activity.id} 
+      style={styles.activityCard}
+      onPress={() => handleActivityPress(activity)}
+    >
       <View style={styles.activityHeader}>
         <View style={styles.activityTime}>
           <Text style={styles.timeText}>{activity.time}</Text>
           <Text style={styles.durationText}>{activity.estimatedDuration} min</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(activity.priority) }]}>
+            <Text style={styles.priorityText}>{getPriorityText(activity.priority)}</Text>
+          </View>
         </View>
         <View style={styles.activityContent}>
           <Text style={styles.activityTitle}>{activity.title}</Text>
@@ -208,19 +335,18 @@ export default function ScheduledActivitiesScreen() {
           )}
           <View style={styles.activityDetails}>
             <View style={styles.detailRow}>
-              <Ionicons name="location-outline" size={14} color="#64748B" />
+              <Ionicons name="location-outline" size={14} color="#737373" />
               <Text style={styles.locationText}>{activity.location}</Text>
             </View>
             {activity.assignedBy && (
               <View style={styles.detailRow}>
-                <Ionicons name="person-outline" size={14} color="#64748B" />
+                <Ionicons name="person-outline" size={14} color="#737373" />
                 <Text style={styles.assignedText}>Asignado por: {activity.assignedBy}</Text>
               </View>
             )}
           </View>
         </View>
         <View style={styles.activityIcons}>
-          <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(activity.priority) }]} />
           <Ionicons 
             name={getActivityIcon(activity.type)} 
             size={20} 
@@ -233,7 +359,10 @@ export default function ScheduledActivitiesScreen() {
   );
 
   const renderAgendaView = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = (() => {
+      const todayDate = new Date();
+      return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+    })();
     const todayActivities = getActivitiesForDate(today);
     const upcomingActivities = activities.filter(activity => activity.date > today).slice(0, 10);
 
@@ -244,14 +373,14 @@ export default function ScheduledActivitiesScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#0891B2']}
+            colors={['#ff6d00']}
           />
         }
       >
         {/* Actividades de hoy */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="today" size={20} color="#0891B2" />
+            <Ionicons name="today" size={20} color="#ff6d00" />
             <Text style={styles.sectionTitle}>Hoy ({todayActivities.length})</Text>
           </View>
           {todayActivities.length > 0 ? (
@@ -266,14 +395,14 @@ export default function ScheduledActivitiesScreen() {
         {/* Próximas actividades */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={20} color="#0891B2" />
+            <Ionicons name="calendar-outline" size={20} color="#ff6d00" />
             <Text style={styles.sectionTitle}>Próximas Actividades</Text>
           </View>
           {upcomingActivities.length > 0 ? (
             upcomingActivities.map(activity => (
               <View key={activity.id} style={styles.upcomingActivity}>
                 <Text style={styles.upcomingDate}>
-                  {new Date(activity.date).toLocaleDateString('es-ES', { 
+                  {createLocalDate(activity.date).toLocaleDateString('es-ES', { 
                     weekday: 'short', 
                     month: 'short', 
                     day: 'numeric' 
@@ -301,33 +430,52 @@ export default function ScheduledActivitiesScreen() {
           current={selectedDate}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
+          firstDay={1} // Empezar el lunes (0 = domingo, 1 = lunes)
+          hideExtraDays={true} // Ocultar días de otros meses
+          disableMonthChange={false}
+          hideArrows={false}
+          hideDayNames={false}
+          showWeekNumbers={false}
+          onPressArrowLeft={subtractMonth => subtractMonth()}
+          onPressArrowRight={addMonth => addMonth()}
+          disableArrowLeft={false}
+          disableArrowRight={false}
           theme={{
             backgroundColor: '#ffffff',
             calendarBackground: '#ffffff',
-            textSectionTitleColor: '#b6c1cd',
-            selectedDayBackgroundColor: '#0891B2',
+            textSectionTitleColor: '#505759', // neutral-800
+            textSectionTitleDisabledColor: '#d4d4d4', // neutral-300
+            selectedDayBackgroundColor: '#ff6d00', // brand-500
             selectedDayTextColor: '#ffffff',
-            todayTextColor: '#0891B2',
-            dayTextColor: '#2d4150',
-            textDisabledColor: '#d9e1e8',
-            dotColor: '#00adf5',
+            todayTextColor: '#ff6d00', // brand-500
+            dayTextColor: '#505759', // neutral-800
+            textDisabledColor: '#d4d4d4', // neutral-300
+            dotColor: '#ff6d00', // brand-500
             selectedDotColor: '#ffffff',
-            arrowColor: '#0891B2',
-            disabledArrowColor: '#d9e1e8',
-            monthTextColor: '#0891B2',
-            indicatorColor: '#0891B2',
-            textDayFontWeight: '300',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '300',
+            arrowColor: '#ff6d00', // brand-500
+            disabledArrowColor: '#d4d4d4', // neutral-300
+            monthTextColor: '#505759', // neutral-800
+            indicatorColor: '#ff6d00', // brand-500
+            textDayFontFamily: 'System',
+            textMonthFontFamily: 'System',
+            textDayHeaderFontFamily: 'System',
+            textDayFontWeight: '400',
+            textMonthFontWeight: '600',
+            textDayHeaderFontWeight: '500',
             textDayFontSize: 16,
-            textMonthFontSize: 16,
-            textDayHeaderFontSize: 13
+            textMonthFontSize: 18,
+            textDayHeaderFontSize: 13,
+            agendaDayTextColor: '#505759', // neutral-800
+            agendaDayNumColor: '#505759', // neutral-800
+            agendaTodayColor: '#ff6d00', // brand-500
+            agendaKnobColor: '#ff6d00' // brand-500
           }}
+
         />
         
         <ScrollView style={styles.selectedDateActivities}>
           <Text style={styles.selectedDateTitle}>
-            Actividades para {new Date(selectedDate).toLocaleDateString('es-ES', { 
+            Actividades para {createLocalDate(selectedDate).toLocaleDateString('es-ES', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
@@ -352,7 +500,7 @@ export default function ScheduledActivitiesScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
+          <ActivityIndicator size="large" color="#ff6d00" />
           <Text style={styles.loadingText}>
             {isLoading ? 'Verificando autenticación...' : 'Cargando actividades programadas...'}
           </Text>
@@ -384,7 +532,7 @@ export default function ScheduledActivitiesScreen() {
             <Ionicons 
               name="list" 
               size={20} 
-              color={viewMode === 'agenda' ? '#ffffff' : '#64748b'} 
+              color={viewMode === 'agenda' ? '#ffffff' : '#737373'} 
             />
             <Text style={[styles.toggleText, viewMode === 'agenda' && styles.activeToggleText]}>
               Agenda
@@ -397,7 +545,7 @@ export default function ScheduledActivitiesScreen() {
             <Ionicons 
               name="calendar" 
               size={20} 
-              color={viewMode === 'calendar' ? '#ffffff' : '#64748b'} 
+              color={viewMode === 'calendar' ? '#ffffff' : '#737373'} 
             />
             <Text style={[styles.toggleText, viewMode === 'calendar' && styles.activeToggleText]}>
               Calendario
@@ -407,6 +555,15 @@ export default function ScheduledActivitiesScreen() {
       </View>
 
       {viewMode === 'agenda' ? renderAgendaView() : renderCalendarView()}
+
+      {/* Modal de detalles de actividad */}
+      <ActivityDetailsModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        activity={selectedActivity}
+        onCompleteActivity={handleCompleteActivity}
+        onRefresh={loadActivities}
+      />
     </SafeAreaView>
   );
 }
@@ -414,24 +571,24 @@ export default function ScheduledActivitiesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f5f5', // neutral-50
   },
   header: {
     backgroundColor: 'white',
     padding: 20,
     paddingTop: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e5e5e5', // neutral-200
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 12,
   },
   viewToggle: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#f0f0f0', // neutral-100
     borderRadius: 8,
     padding: 4,
   },
@@ -445,13 +602,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   activeToggle: {
-    backgroundColor: '#0891B2',
+    backgroundColor: '#ff6d00', // brand-500
   },
   toggleText: {
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '500',
-    color: '#64748b',
+    color: '#737373', // neutral-500
   },
   activeToggleText: {
     color: '#ffffff',
@@ -463,7 +620,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#64748B',
+    color: '#737373', // neutral-500
     fontSize: 16,
   },
   agendaContainer: {
@@ -484,7 +641,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginLeft: 8,
   },
   activityCard: {
@@ -512,11 +669,11 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
   },
   durationText: {
     fontSize: 11,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginTop: 2,
   },
   activityContent: {
@@ -525,12 +682,12 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 4,
   },
   activityDescription: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -543,22 +700,17 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginLeft: 4,
   },
   assignedText: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     marginLeft: 4,
   },
   activityIcons: {
     alignItems: 'center',
     gap: 8,
-  },
-  priorityIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
   statusIndicator: {
     width: 6,
@@ -571,7 +723,7 @@ const styles = StyleSheet.create({
   upcomingDate: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0891B2',
+    color: '#ff6d00', // brand-500
     marginBottom: 4,
     textTransform: 'capitalize',
   },
@@ -582,7 +734,7 @@ const styles = StyleSheet.create({
   selectedDateTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#505759', // neutral-800
     marginBottom: 12,
     textTransform: 'capitalize',
   },
@@ -592,7 +744,19 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#737373', // neutral-500
     textAlign: 'center',
+  },
+  priorityBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginTop: 4,
+    alignSelf: 'center',
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 }); 

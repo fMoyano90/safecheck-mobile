@@ -28,7 +28,6 @@ interface RecurringActivity {
   requiresSignature: boolean;
   requiresPhotos: boolean;
   lastCompleted?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
   templates?: string[];
   status?: string;
   contract?: string;
@@ -84,15 +83,6 @@ export default function RecurringActivitiesScreen() {
       }
     }
 
-    // Determinar prioridad (mapear de status a priority)
-    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
-    switch (activity.status) {
-      case 'active': priority = 'high'; break;
-      case 'paused': priority = 'medium'; break;
-      case 'inactive': priority = 'low'; break;
-      default: priority = 'medium';
-    }
-
     return {
       id: activity.id,
       name,
@@ -103,7 +93,6 @@ export default function RecurringActivitiesScreen() {
       requiresSignature: false,
       requiresPhotos: false,
       lastCompleted: activity.lastCompleted,
-      priority,
       templates,
       status: activity.status,
     };
@@ -187,43 +176,32 @@ export default function RecurringActivitiesScreen() {
     setRefreshing(false);
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return '#F44336';
-      case 'medium':
-        return '#FF9800';
-      case 'low':
-        return '#4CAF50';
-      default:
-        return '#9E9E9E';
-    }
-  };
-
   const getFrequencyIcon = (frequency: string) => {
     switch (frequency.toLowerCase()) {
       case 'diaria':
+      case 'daily':
         return 'calendar';
       case 'semanal':
+      case 'weekly':
         return 'calendar-outline';
-      case 'quincenal':
-        return 'calendar-clear-outline';
       case 'mensual':
-        return 'calendar-number-outline';
+      case 'monthly':
+        return 'calendar-clear';
       default:
-        return 'calendar';
+        return 'refresh';
     }
   };
 
   const getFrequencyBadgeColor = (frequency: string) => {
     switch (frequency.toLowerCase()) {
       case 'diaria':
-        return '#3B82F6';
+      case 'daily':
+        return '#EF4444';
       case 'semanal':
-        return '#8B5CF6';
-      case 'según necesidad':
-      case 'cuando sea necesario':
-      case 'cuando ocurra':
+      case 'weekly':
+        return '#F59E0B';
+      case 'mensual':
+      case 'monthly':
         return '#10B981';
       default:
         return '#6B7280';
@@ -235,9 +213,6 @@ export default function RecurringActivitiesScreen() {
       <View style={styles.activityHeader}>
         <View style={styles.activityTitle}>
           <Text style={styles.activityName}>{item.name}</Text>
-          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
-            <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
-          </View>
         </View>
       </View>
 
@@ -473,16 +448,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     flex: 1,
     marginRight: 8,
-  },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priorityText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
   },
   activityDescription: {
     fontSize: 14,

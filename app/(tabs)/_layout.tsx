@@ -47,7 +47,7 @@ export default function TabLayout() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0891B2" />
+        <ActivityIndicator size="large" color="#0066cc" />
       </View>
     );
   }

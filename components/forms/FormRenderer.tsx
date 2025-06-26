@@ -549,7 +549,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               style={[styles.navButton, styles.navButtonSecondary, styles.navButtonIcon]}
               onPress={() => setCurrentPage(currentPage - 1)}
             >
-              <Ionicons name="chevron-back" size={28} color="#0891B2" />
+              <Ionicons name="chevron-back" size={20} color="#0066cc" />
             </TouchableOpacity>
           )}
           
@@ -596,23 +596,28 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7fa',
   },
   header: {
     backgroundColor: 'white',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e1e8ed',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   formTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#2c3e50',
     marginBottom: 4,
   },
   formDescription: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#7f8c8d',
     marginBottom: 16,
   },
   progressContainer: {
@@ -623,18 +628,18 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 4,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#e1e8ed',
     borderRadius: 2,
     marginRight: 12,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0891B2',
+    backgroundColor: '#0066cc',
     borderRadius: 2,
   },
   progressText: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#7f8c8d',
     fontWeight: '500',
   },
   formContainer: {
@@ -650,7 +655,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#2c3e50',
     marginBottom: 8,
   },
   required: {
@@ -663,6 +668,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   textArea: {
     height: 100,
@@ -673,6 +683,11 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     borderRadius: 8,
     backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   picker: {
     height: 50,
@@ -688,7 +703,7 @@ const styles = StyleSheet.create({
   },
   radioText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#34495e',
   },
   checkboxContainer: {
     gap: 12,
@@ -701,7 +716,7 @@ const styles = StyleSheet.create({
   },
   checkboxText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#34495e',
   },
   dateButton: {
     flexDirection: 'row',
@@ -712,10 +727,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   dateButtonText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#34495e',
   },
   photoContainer: {
     gap: 16,
@@ -730,21 +750,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0891B2',
+    backgroundColor: '#0066cc',
     padding: 12,
     borderRadius: 8,
+    shadowColor: '#0066cc',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   photoButtonSecondary: {
     backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#0891B2',
+    borderColor: '#0066cc',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   photoButtonText: {
     color: 'white',
     fontWeight: '600',
   },
   photoButtonTextSecondary: {
-    color: '#0891B2',
+    color: '#0066cc',
   },
   photoGrid: {
     flexDirection: 'row',
@@ -765,6 +795,11 @@ const styles = StyleSheet.create({
     right: -8,
     backgroundColor: 'white',
     borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   signatureContainer: {
     gap: 16,
@@ -775,6 +810,11 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     borderRadius: 8,
     backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   signatureButtons: {
     flexDirection: 'row',
@@ -787,13 +827,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   signatureButtonPrimary: {
-    backgroundColor: '#0891B2',
-    borderColor: '#0891B2',
+    backgroundColor: '#0066cc',
+    borderColor: '#0066cc',
+    shadowColor: '#0066cc',
+    shadowOpacity: 0.2,
   },
   signatureButtonText: {
-    color: '#374151',
+    color: '#34495e',
     fontWeight: '600',
   },
   signatureButtonTextPrimary: {
@@ -801,12 +848,12 @@ const styles = StyleSheet.create({
   },
   signaturePreview: {
     padding: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#e6f3ff',
     borderRadius: 8,
     alignItems: 'center',
   },
   signaturePreviewText: {
-    color: '#0891B2',
+    color: '#0066cc',
     fontWeight: '600',
   },
   locationContainer: {
@@ -817,28 +864,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0891B2',
+    backgroundColor: '#ff6d00',
     padding: 12,
     borderRadius: 8,
+    shadowColor: '#ff6d00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   locationButtonText: {
     color: 'white',
     fontWeight: '600',
   },
   locationInfo: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#fff5f0',
     padding: 12,
     borderRadius: 8,
     gap: 4,
   },
   locationText: {
     fontSize: 14,
-    color: '#0891B2',
+    color: '#ff6d00',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   locationAccuracy: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#7f8c8d',
     fontStyle: 'italic',
   },
   errorText: {
@@ -849,8 +901,13 @@ const styles = StyleSheet.create({
   navigationContainer: {
     backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: '#e1e8ed',
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   navigationButtons: {
     flexDirection: 'row',
@@ -863,14 +920,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0891B2',
+    backgroundColor: '#0066cc',
     padding: 16,
     borderRadius: 8,
+    shadowColor: '#0066cc',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   navButtonSecondary: {
     backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#0891B2',
+    borderColor: '#0066cc',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   navButtonIcon: {
     flex: 0,
@@ -882,12 +949,18 @@ const styles = StyleSheet.create({
   },
   navButtonDisabled: {
     backgroundColor: '#9CA3AF',
+    shadowColor: '#9CA3AF',
   },
   saveButton: {
     flex: 0.5,
     backgroundColor: 'white',
     borderWidth: 1,
     borderColor: '#d1d5db',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   navButtonText: {
     color: 'white',
@@ -895,7 +968,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   navButtonTextSecondary: {
-    color: '#0891B2',
+    color: '#0066cc',
   },
   saveButtonText: {
     color: '#6B7280',

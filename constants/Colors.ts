@@ -1,4 +1,4 @@
-const tintColorLight = '#2f95dc';
+const tintColorLight = '#0066cc'; // SafetyTech Blue
 const tintColorDark = '#fff';
 
 export default {
