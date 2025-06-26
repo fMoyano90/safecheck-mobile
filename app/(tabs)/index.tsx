@@ -3,8 +3,9 @@ import { Text, View } from '@/components/Themed';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
-import { activitiesApi, type Activity } from '@/lib/api';
+import { activitiesApi, type Activity, recurringActivitiesApi, type RecurringActivity } from '@/lib/api';
 import React, { useState, useEffect } from 'react';
+import FormButton from '@/components/activities/FormButton';
 
 // Tipos locales para el componente
 type LocalActivity = {
@@ -66,12 +67,45 @@ const convertToLocalActivity = (activity: Activity): LocalActivity => {
   };
 };
 
+// Función para convertir RecurringActivity del backend a LocalActivity para mostrar
+const convertRecurringToLocalActivity = (recurringActivity: RecurringActivity): LocalActivity => {
+  // Para actividades recurrentes, no hay hora específica
+  const time = 'Diario';
+  
+  // Título basado en el template
+  let title = 'Actividad Recurrente';
+  if (recurringActivity.template) {
+    title = recurringActivity.template.name;
+  }
+  
+  // Determinar tipo basado en la categoría del template
+  let type = 'recurring';
+  if (recurringActivity.template?.category) {
+    const categoryName = recurringActivity.template.category.name.toLowerCase();
+    if (categoryName.includes('inspección') || categoryName.includes('inspection')) type = 'inspection';
+    else if (categoryName.includes('capacitación') || categoryName.includes('training')) type = 'training';
+    else if (categoryName.includes('evaluación') || categoryName.includes('evaluation')) type = 'evaluation';
+    else if (categoryName.includes('reunión') || categoryName.includes('meeting')) type = 'meeting';
+  }
+  
+  return {
+    id: recurringActivity.id,
+    time,
+    title,
+    location: recurringActivity.template?.category?.name || 'Sin categoría',
+    type,
+    priority: 'medium', // Las actividades recurrentes no tienen prioridad definida
+    status: recurringActivity.status === 'active' ? 'pending' : 'completed',
+  };
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [todayActivities, setTodayActivities] = useState<LocalActivity[]>([]);
   const [completedActivities, setCompletedActivities] = useState<LocalActivity[]>([]);
   const [upcomingActivities, setUpcomingActivities] = useState<Activity[]>([]);
+  const [recurringActivities, setRecurringActivities] = useState<RecurringActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -129,18 +163,20 @@ export default function HomeScreen() {
     try {
       setLoadingActivities(true);
       
-      // Cargar actividades en paralelo
-      const [upcomingActivities, todayCompleted] = await Promise.all([
+      // Cargar actividades y actividades recurrentes en paralelo
+      const [upcomingActivities, todayCompleted, recurring] = await Promise.all([
         activitiesApi.getUpcoming().then(activities => 
           activities.filter(a => a.status === 'pending')
         ),
         activitiesApi.getTodayCompleted(),
+        recurringActivitiesApi.getActive(),
       ]);
       
       // Convertir las actividades próximas a formato local para mostrar
       setTodayActivities(upcomingActivities.map(convertToLocalActivity));
       setCompletedActivities(todayCompleted.map(convertToLocalActivity));
       setUpcomingActivities(upcomingActivities);
+      setRecurringActivities(recurring);
       
     } catch (error) {
       console.error('Error loading activities:', error);
@@ -148,6 +184,7 @@ export default function HomeScreen() {
       setTodayActivities([]);
       setCompletedActivities([]);
       setUpcomingActivities([]);
+      setRecurringActivities([]);
     } finally {
       setLoadingActivities(false);
     }
@@ -310,36 +347,76 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Actividades recurrentes frecuentes */}
+      {/* Actividades recurrentes */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <FontAwesome name="star" size={20} color="#FFC107" />
-          <Text style={styles.sectionTitle}>Actividades Más Utilizadas</Text>
+          <FontAwesome name="refresh" size={20} color="#FF9800" />
+          <Text style={styles.sectionTitle}>Actividades Recurrentes</Text>
         </View>
         
-        {frequentActivities.map((activity) => (
-          <TouchableOpacity 
-            key={activity.id} 
-            style={styles.recurringActivityCard}
-            onPress={() => router.push('/recurring-activities')}
-          >
-            <View style={styles.recurringActivityContent}>
-              <Text style={styles.recurringActivityTitle}>{activity.name}</Text>
-              <Text style={styles.recurringActivityStatus}>
-                {activity.category} • Última vez: {new Date(activity.lastUsed).toLocaleDateString('es-ES')}
-              </Text>
-            </View>
-            <FontAwesome name="chevron-right" size={14} color="#94A3B8" />
-          </TouchableOpacity>
-        ))}
-        
-        <TouchableOpacity 
-          style={styles.viewAllButton}
-          onPress={() => router.push('/recurring-activities')}
-        >
-          <Text style={styles.viewAllText}>Ver todas las actividades recurrentes</Text>
-          <FontAwesome name="arrow-right" size={14} color="#0891B2" />
-        </TouchableOpacity>
+        {loadingActivities ? (
+          <View style={styles.activityLoadingContainer}>
+            <ActivityIndicator size="small" color="#0891B2" />
+            <Text style={styles.activityLoadingText}>Cargando actividades recurrentes...</Text>
+          </View>
+        ) : recurringActivities.length > 0 ? (
+          <>
+            {recurringActivities.slice(0, 3).map((recurringActivity) => {
+              const localActivity = convertRecurringToLocalActivity(recurringActivity);
+              return (
+                <View 
+                  key={recurringActivity.id} 
+                  style={[styles.homeActivityCard, styles.recurringActivityCard]}
+                >
+                  <View style={styles.homeActivityHeader}>
+                    <View style={styles.activityTime}>
+                      <Text style={styles.timeText}>{localActivity.time}</Text>
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle}>{localActivity.title}</Text>
+                      <View style={styles.activityDetails}>
+                        <FontAwesome 
+                          name={getActivityIcon(localActivity.type)} 
+                          size={12} 
+                          color={getActivityColor(localActivity.type)} 
+                        />
+                        <Text style={styles.locationText}>{localActivity.location}</Text>
+                      </View>
+                      {recurringActivity.completionCount > 0 && (
+                        <Text style={styles.completionCount}>
+                          Completada {recurringActivity.completionCount} {recurringActivity.completionCount === 1 ? 'vez' : 'veces'}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.activityActions}>
+                      <FormButton
+                        activityId={recurringActivity.id}
+                        activityType="recurring"
+                        activityName={localActivity.title}
+                        size="small"
+                        variant="primary"
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+            
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => router.push('/recurring-activities')}
+            >
+              <Text style={styles.viewAllText}>Ver todas las actividades recurrentes</Text>
+              <FontAwesome name="arrow-right" size={12} color="#0891B2" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <FontAwesome name="refresh" size={48} color="#94A3B8" />
+            <Text style={styles.emptyStateTitle}>No hay actividades recurrentes</Text>
+            <Text style={styles.emptyStateText}>Las actividades recurrentes son tareas que realizas regularmente</Text>
+          </View>
+        )}
       </View>
 
       {/* Próximas actividades */}
@@ -658,21 +735,8 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   recurringActivityCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
   },
 
   recurringActivityContent: {
@@ -797,5 +861,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+  },
+  completionCount: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  activityActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

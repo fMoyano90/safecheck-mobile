@@ -11,85 +11,106 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
+import { activitiesApi, type Activity } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 
 interface ScheduledActivity {
-  id: string;
+  id: number;
   title: string;
   description?: string;
   date: string;
   time: string;
   location: string;
   type: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'pending' | 'completed' | 'approved' | 'rejected' | 'overdue';
   assignedBy?: string;
-  estimatedDuration: number;
+  estimatedDuration?: number;
+  dueDate?: string;
+  templates?: string[];
 }
 
 type ViewMode = 'agenda' | 'calendar';
 
 export default function ScheduledActivitiesScreen() {
+  const { user, isLoading } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('agenda');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Datos mockup para actividades programadas
-  const mockActivities: ScheduledActivity[] = [
-    {
-      id: '1',
-      title: 'Inspección de Seguridad Área A',
-      description: 'Revisión completa de protocolos de seguridad en el área de producción A',
-      date: '2024-01-16',
-      time: '09:00',
-      location: 'Planta Principal - Área A',
-      type: 'inspection',
-      priority: 'high',
-      status: 'pending',
-      assignedBy: 'Supervisor Carlos Mendez',
-      estimatedDuration: 60,
-    },
-    {
-      id: '2',
-      title: 'Capacitación en Uso de EPP',
-      description: 'Sesión de entrenamiento sobre el uso correcto del equipo de protección personal',
-      date: '2024-01-16',
-      time: '11:30',
-      location: 'Sala de Conferencias B',
-      type: 'training',
-      priority: 'medium',
-      status: 'pending',
-      assignedBy: 'Jefe de Seguridad Ana García',
-      estimatedDuration: 90,
-    },
-    {
-      id: '3',
-      title: 'Evaluación de Riesgos Proyecto X',
-      description: 'Análisis de riesgos para el nuevo proyecto de expansión',
-      date: '2024-01-16',
-      time: '14:00',
-      location: 'Oficina Central - Sala 203',
-      type: 'evaluation',
-      priority: 'high',
-      status: 'pending',
-      assignedBy: 'Director de Operaciones Luis Torres',
-      estimatedDuration: 120,
-    },
-  ];
+  // Función para convertir Activity del backend a ScheduledActivity
+  const convertToScheduledActivity = (activity: Activity): ScheduledActivity => {
+    const assignedDate = new Date(activity.assignedDate);
+    const time = assignedDate.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+    const date = assignedDate.toISOString().split('T')[0];
+    
+    // Título basado en los templates
+    let title = 'Actividad';
+    let templates: string[] = [];
+    if (activity.templates && activity.templates.length > 0) {
+      if (activity.templates.length === 1) {
+        title = activity.templates[0].name;
+      } else {
+        title = `${activity.templates[0].name} (+${activity.templates.length - 1} más)`;
+      }
+      templates = activity.templates.map(t => t.name);
+    }
+    
+    // Determinar tipo basado en la categoría del template
+    let type = 'task';
+    if (activity.templates && activity.templates.length > 0 && activity.templates[0].category) {
+      const categoryName = activity.templates[0].category.name.toLowerCase();
+      if (categoryName.includes('inspección') || categoryName.includes('inspection')) type = 'inspection';
+      else if (categoryName.includes('capacitación') || categoryName.includes('training')) type = 'training';
+      else if (categoryName.includes('evaluación') || categoryName.includes('evaluation')) type = 'evaluation';
+      else if (categoryName.includes('reunión') || categoryName.includes('meeting')) type = 'meeting';
+    }
+    
+    return {
+      id: activity.id,
+      title,
+      description: activity.observations || 'Sin descripción adicional',
+      date,
+      time,
+      location: activity.contract?.name || 'Ubicación no especificada',
+      type,
+      priority: activity.priority,
+      status: activity.status,
+      assignedBy: activity.assignedBy ? `${activity.assignedBy.firstName} ${activity.assignedBy.lastName}` : undefined,
+      dueDate: activity.dueDate,
+      templates,
+    };
+  };
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    if (user && !isLoading) {
+      loadActivities();
+    }
+  }, [user, isLoading]);
 
   const loadActivities = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
-      // En una implementación real, aquí cargarías las actividades programadas del usuario desde la API
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular carga
-      setActivities(mockActivities);
+      // Cargar todas las actividades del usuario
+      const userActivities = await activitiesApi.getMyActivities();
+      
+      // Convertir a formato ScheduledActivity y ordenar por fecha
+      const scheduledActivities = userActivities
+        .map(convertToScheduledActivity)
+        .sort((a, b) => new Date(a.date + ' ' + a.time).getTime() - new Date(b.date + ' ' + b.time).getTime());
+      
+      setActivities(scheduledActivities);
     } catch (err) {
       console.error('Error loading activities:', err);
+      setActivities([]);
     } finally {
       setLoading(false);
     }
@@ -133,9 +154,12 @@ export default function ScheduledActivitiesScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'approved':
         return '#4CAF50';
-      case 'in_progress':
-        return '#FF9800';
+      case 'rejected':
+        return '#F44336';
+      case 'overdue':
+        return '#FF5722';
       case 'pending':
         return '#2196F3';
       default:
@@ -323,12 +347,26 @@ export default function ScheduledActivitiesScreen() {
     );
   };
 
-  if (loading) {
+  // Mostrar loading si el usuario se está autenticando o cargando actividades
+  if (isLoading || loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#0891B2" />
-          <Text style={styles.loadingText}>Cargando actividades programadas...</Text>
+          <Text style={styles.loadingText}>
+            {isLoading ? 'Verificando autenticación...' : 'Cargando actividades programadas...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Si no hay usuario autenticado, mostrar mensaje
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>Necesitas iniciar sesión para ver tus actividades programadas</Text>
         </View>
       </SafeAreaView>
     );

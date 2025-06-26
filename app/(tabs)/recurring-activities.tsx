@@ -14,9 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import FormRenderer from '../../components/forms/FormRenderer';
 import useFormTemplates from '../../hooks/useFormTemplates';
+import { recurringActivitiesApi, type RecurringActivity as APIRecurringActivity } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import FormButton from '@/components/activities/FormButton';
 
 interface RecurringActivity {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   category: string;
@@ -25,13 +28,17 @@ interface RecurringActivity {
   requiresSignature: boolean;
   requiresPhotos: boolean;
   lastCompleted?: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  templates?: string[];
+  status?: string;
+  contract?: string;
 }
 
 export default function RecurringActivitiesScreen() {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
   const {
-    loading,
+    loading: formLoading,
     error,
     getCategories,
     getTemplatesByCategory,
@@ -43,110 +50,96 @@ export default function RecurringActivitiesScreen() {
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Datos mockup para actividades recurrentes
-  const mockActivities: RecurringActivity[] = [
-    {
-      id: '1',
-      name: 'Inspección de Seguridad Diaria',
-      description: 'Revisión general de condiciones de seguridad en el área de trabajo',
-      category: 'Inspecciones',
-      frequency: 'Según necesidad',
-      estimatedTime: 15,
-      requiresSignature: true,
-      requiresPhotos: true,
-      lastCompleted: '2024-01-15',
-      priority: 'high',
-    },
-    {
-      id: '2',
-      name: 'Verificación de EPP',
-      description: 'Control del estado y uso correcto del equipo de protección personal',
-      category: 'EPP',
-      frequency: 'Diaria',
-      estimatedTime: 10,
+  // Función para convertir APIRecurringActivity a RecurringActivity local
+  const convertToRecurringActivity = (activity: APIRecurringActivity): RecurringActivity => {
+    // Determinar categoría basada en template
+    let category = 'General';
+    let templates: string[] = [];
+    if (activity.template) {
+      // Usar la categoría del template
+      if (activity.template.category) {
+        category = activity.template.category.name;
+      }
+      templates = [activity.template.name];
+    }
+
+    // Título basado en el template
+    let name = 'Actividad Recurrente';
+    if (activity.template) {
+      name = activity.template.name;
+    }
+
+    // Determinar frecuencia basada en el tipo del template
+    let frequency = 'Según necesidad';
+    if (activity.template?.type) {
+      switch (activity.template.type.toLowerCase()) {
+        case 'daily': frequency = 'Diaria'; break;
+        case 'weekly': frequency = 'Semanal'; break;
+        case 'monthly': frequency = 'Mensual'; break;
+        case 'inspection': frequency = 'Diaria'; break;
+        case 'report': frequency = 'Según necesidad'; break;
+        default: frequency = 'Según necesidad';
+      }
+    }
+
+    // Determinar prioridad (mapear de status a priority)
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
+    switch (activity.status) {
+      case 'active': priority = 'high'; break;
+      case 'paused': priority = 'medium'; break;
+      case 'inactive': priority = 'low'; break;
+      default: priority = 'medium';
+    }
+
+    return {
+      id: activity.id,
+      name,
+      description: activity.template?.description || 'Sin descripción adicional',
+      category,
+      frequency,
+      estimatedTime: 30, // Valor por defecto
       requiresSignature: false,
-      requiresPhotos: true,
-      lastCompleted: '2024-01-15',
-      priority: 'medium',
-    },
-    {
-      id: '3',
-      name: 'Inspección de Herramientas',
-      description: 'Revisión del estado y funcionamiento de herramientas de trabajo',
-      category: 'Herramientas',
-      frequency: 'Semanal',
-      estimatedTime: 30,
-      requiresSignature: true,
-      requiresPhotos: true,
-      lastCompleted: '2024-01-10',
-      priority: 'medium',
-    },
-    {
-      id: '4',
-      name: 'Evaluación de Riesgos del Área',
-      description: 'Identificación y evaluación de riesgos potenciales en el área de trabajo',
-      category: 'Evaluaciones',
-      frequency: 'Cuando sea necesario',
-      estimatedTime: 45,
-      requiresSignature: true,
       requiresPhotos: false,
-      lastCompleted: '2024-01-01',
-      priority: 'high',
-    },
-    {
-      id: '5',
-      name: 'Limpieza y Orden (5S)',
-      description: 'Verificación del cumplimiento de las 5S en el área de trabajo',
-      category: 'Orden y Limpieza',
-      frequency: 'Diaria',
-      estimatedTime: 20,
-      requiresSignature: false,
-      requiresPhotos: true,
-      lastCompleted: '2024-01-15',
-      priority: 'low',
-    },
-    {
-      id: '6',
-      name: 'Reporte de Incidente',
-      description: 'Formulario para reportar cualquier incidente de seguridad',
-      category: 'Reportes',
-      frequency: 'Cuando ocurra',
-      estimatedTime: 10,
-      requiresSignature: true,
-      requiresPhotos: true,
-      priority: 'high',
-    },
-    {
-      id: '7',
-      name: 'Solicitud de Mantenimiento',
-      description: 'Solicitar reparación o mantenimiento de equipos',
-      category: 'Mantenimiento',
-      frequency: 'Según necesidad',
-      estimatedTime: 5,
-      requiresSignature: false,
-      requiresPhotos: true,
-      priority: 'medium',
-    },
-  ];
+      lastCompleted: activity.lastCompleted,
+      priority,
+      templates,
+      status: activity.status,
+    };
+  };
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    if (user && !isLoading) {
+      loadActivities();
+    }
+  }, [user, isLoading]);
 
   const loadActivities = async () => {
+    if (!user) return;
+
+    setLoading(true);
     try {
-      // En una implementación real, aquí cargarías las actividades recurrentes del usuario desde la API
-      setActivities(mockActivities);
+      // Cargar actividades recurrentes del usuario
+      const userRecurringActivities = await recurringActivitiesApi.getMyRecurringActivities();
+      
+      // Convertir a formato local
+      const convertedActivities = userRecurringActivities.map(convertToRecurringActivity);
+      
+      setActivities(convertedActivities);
     } catch (err) {
+      console.error('Error loading recurring activities:', err);
       Alert.alert('Error', 'No se pudieron cargar las actividades recurrentes');
+      setActivities([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const startActivity = async (activity: RecurringActivity) => {
     try {
       // En una implementación real, aquí cargarías el formulario correspondiente
-      const templateData = await getTemplatePreview(activity.id);
+      const templateData = await getTemplatePreview(activity.id.toString());
       setSelectedActivity(templateData);
       setShowForm(true);
     } catch (err) {
@@ -238,10 +231,7 @@ export default function RecurringActivitiesScreen() {
   };
 
   const renderActivity = ({ item }: { item: RecurringActivity }) => (
-    <TouchableOpacity
-      style={styles.activityCard}
-      onPress={() => startActivity(item)}
-    >
+    <View style={styles.activityCard}>
       <View style={styles.activityHeader}>
         <View style={styles.activityTitle}>
           <Text style={styles.activityName}>{item.name}</Text>
@@ -297,7 +287,17 @@ export default function RecurringActivitiesScreen() {
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+
+      <View style={styles.activityActions}>
+        <FormButton
+          activityId={item.id}
+          activityType="recurring"
+          activityName={item.name}
+          size="medium"
+          variant="primary"
+        />
+      </View>
+    </View>
   );
 
   if (showForm && selectedActivity) {
@@ -333,6 +333,31 @@ export default function RecurringActivitiesScreen() {
     );
   }
 
+  // Mostrar loading si el usuario se está autenticando o cargando actividades
+  if (isLoading || loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#0891B2" />
+          <Text style={styles.loadingText}>
+            {isLoading ? 'Verificando autenticación...' : 'Cargando actividades recurrentes...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Si no hay usuario autenticado, mostrar mensaje
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>Necesitas iniciar sesión para ver tus actividades recurrentes</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -342,27 +367,32 @@ export default function RecurringActivitiesScreen() {
         </Text>
       </View>
 
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
-          <Text style={styles.loadingText}>Cargando actividades...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={activities}
-          renderItem={renderActivity}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#0891B2']}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+      <FlatList
+        data={activities}
+        renderItem={renderActivity}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={[
+          styles.listContainer,
+          activities.length === 0 && styles.emptyContainer
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0891B2']}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="repeat-outline" size={64} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>Sin actividades recurrentes</Text>
+            <Text style={styles.emptyText}>
+              No tienes actividades recurrentes asignadas en este momento.
+            </Text>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -544,5 +574,36 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 32,
+  },
+  activityActions: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
 }); 
