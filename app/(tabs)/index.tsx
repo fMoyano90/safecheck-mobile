@@ -11,6 +11,7 @@ import { AppState } from 'react-native';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
 import { SubtleRefreshIndicator } from '../../components/ui/SubtleRefreshIndicator';
+import { documentsApi } from '@/lib/api';
 
 // Tipos locales para el componente
 type LocalActivity = {
@@ -41,15 +42,22 @@ const convertToLocalActivity = (activity: Activity): LocalActivity => {
     hour12: false 
   });
   
-  // Determinar el título basado en los templates
+  // Determinar el título basado en activityName, templates o valor por defecto
   let title = 'Actividad';
-  if (activity.templates && activity.templates.length > 0) {
+  
+  // Prioridad 1: usar activityName si está disponible
+  if (activity.activityName && activity.activityName.trim()) {
+    title = activity.activityName;
+  }
+  // Prioridad 2: usar nombres de templates si no hay activityName
+  else if (activity.templates && activity.templates.length > 0) {
     if (activity.templates.length === 1) {
       title = activity.templates[0].name;
     } else {
       title = `${activity.templates[0].name} (+${activity.templates.length - 1} más)`;
     }
   }
+  // Prioridad 3: mantener "Actividad" como valor por defecto
   
   // Determinar tipo basado en la categoría del template
   let type = 'task';
@@ -65,7 +73,7 @@ const convertToLocalActivity = (activity: Activity): LocalActivity => {
     id: activity.id,
     time,
     title,
-    location: activity.contract?.name || 'Ubicación no especificada',
+    location: activity.location || activity.contract?.name || 'Ubicación no especificada',
     type,
     priority: activity.priority,
     status: activity.status,
@@ -208,19 +216,56 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const handleActivityPress = (localActivity: LocalActivity) => {
+  const handleActivityPress = async (localActivity: LocalActivity) => {
     // Encontrar la actividad completa en upcomingActivities
     const fullActivity = upcomingActivities.find(a => a.id === localActivity.id);
     if (fullActivity) {
-      // Convertir a formato del modal (simulando templates con estados)
-      const activityForModal = {
-        ...fullActivity,
-        templates: fullActivity.templates?.map(template => ({
+      // Cargar los templates usando los templateIds (misma lógica que scheduled.tsx)
+      let templates: Array<{id: number, name: string, description: string, status: 'pending'}> = [];
+      if (fullActivity.templateIds && fullActivity.templateIds.length > 0) {
+        try {
+          // Obtener el template real del primer templateId
+          const templateData = await documentsApi.getActivityTemplate(fullActivity.id);
+          
+          templates = fullActivity.templateIds.map((templateId, index) => ({
+            id: templateId,
+            name: index === 0 ? templateData.name : `Template ${templateId}`,
+            description: index === 0 ? (templateData.description || 'Formulario asignado a esta actividad') : 'Formulario asignado a esta actividad',
+            status: 'pending' as const,
+          }));
+        } catch (error) {
+          console.error('Error cargando template:', error);
+          // Fallback: usar los templates expandidos si están disponibles, sino crear genéricos
+          if (fullActivity.templates && fullActivity.templates.length > 0) {
+            templates = fullActivity.templates.map(template => ({
+              id: template.id,
+              name: template.name,
+              description: template.description || 'Formulario asignado a esta actividad',
+              status: 'pending' as const,
+            }));
+          } else {
+            templates = fullActivity.templateIds.map((templateId, index) => ({
+              id: templateId,
+              name: localActivity.title || `Template ${templateId}`,
+              description: 'Formulario asignado a esta actividad',
+              status: 'pending' as const,
+            }));
+          }
+        }
+      } else if (fullActivity.templates && fullActivity.templates.length > 0) {
+        // Si no hay templateIds pero sí templates expandidos
+        templates = fullActivity.templates.map(template => ({
           id: template.id,
           name: template.name,
-          description: template.description,
-          status: 'pending' as const, // Por ahora todos pendientes
-        })) || [],
+          description: template.description || 'Formulario asignado a esta actividad',
+          status: 'pending' as const,
+        }));
+      }
+      
+      // Convertir a formato del modal (idéntico a scheduled.tsx)
+      const activityForModal = {
+        ...fullActivity,
+        templates: templates,
       };
       
       setSelectedActivity(activityForModal);
@@ -510,7 +555,7 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <FontAwesome name="clock-o" size={20} color="#1565c0" />
-          <Text style={styles.sectionTitle}>Próximas 4 Actividades</Text>
+          <Text style={styles.sectionTitle}>Próximas Actividades</Text>
         </View>
         
         {loadingActivities ? (

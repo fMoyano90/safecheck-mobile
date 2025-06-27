@@ -62,7 +62,7 @@ export const useAutoRefresh = ({
         setIsRefreshing(true);
         await refreshFunction();
         
-        // Marcar que hay actualizaciones disponibles pero no forzar recarga
+        // Marcar que hay actualizaciones disponibles
         setHasUpdates(true);
         onDataChanged?.();
       } catch (error) {

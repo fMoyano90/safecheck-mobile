@@ -35,6 +35,7 @@ interface ActivityDetails {
   templates: ActivityTemplate[];
   observations?: string;
   reviewNotes?: string;
+  location?: string;
 }
 
 interface ActivityDetailsModalProps {
@@ -193,6 +194,14 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
                 </View>
               </View>
             )}
+
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={20} color="#ff6d00" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Ubicación</Text>
+                <Text style={styles.infoValue}>{activity.location || 'Sin especificar'}</Text>
+              </View>
+            </View>
 
             <View style={styles.infoRow}>
               <Ionicons name="calendar-outline" size={20} color="#ff6d00" />

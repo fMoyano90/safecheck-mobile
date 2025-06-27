@@ -86,12 +86,16 @@ export default function ScheduledActivitiesScreen() {
     // Usar la fecha local en lugar de UTC para evitar desfases de zona horaria
     const date = `${assignedDate.getFullYear()}-${String(assignedDate.getMonth() + 1).padStart(2, '0')}-${String(assignedDate.getDate()).padStart(2, '0')}`;
     
-    // Título basado en los templates
+    // Título basado en activityName, templates o valor por defecto
     let title = 'Actividad';
     let templates: string[] = [];
     
-    // Verificar si tenemos templates expandidos o solo templateIds
-    if (activity.templates && activity.templates.length > 0) {
+    // Prioridad 1: usar activityName si está disponible
+    if (activity.activityName && activity.activityName.trim()) {
+      title = activity.activityName;
+    }
+    // Prioridad 2: usar templates expandidos si no hay activityName
+    else if (activity.templates && activity.templates.length > 0) {
       // Templates expandidos
       if (activity.templates.length === 1) {
         title = activity.templates[0].name;
@@ -99,13 +103,14 @@ export default function ScheduledActivitiesScreen() {
         title = `${activity.templates[0].name} (+${activity.templates.length - 1} más)`;
       }
       templates = activity.templates.map(t => t.name);
+    }
+    // Prioridad 3: mantener "Actividad" como valor por defecto (no usar templateIds para generar títulos genéricos)
+    
+    // Solo llenar el array de templates si tenemos templates reales
+    if (activity.templates && activity.templates.length > 0) {
+      templates = activity.templates.map(t => t.name);
     } else if (activity.templateIds && activity.templateIds.length > 0) {
-      // Solo templateIds, crear nombres genéricos
-      if (activity.templateIds.length === 1) {
-        title = `Formulario ${activity.templateIds[0]}`;
-      } else {
-        title = `${activity.templateIds.length} Formularios`;
-      }
+      // Solo para el array de templates, no para el título
       templates = activity.templateIds.map(id => `Formulario ${id}`);
     }
     
@@ -128,7 +133,7 @@ export default function ScheduledActivitiesScreen() {
       description: activity.observations || 'Sin descripción adicional',
       date,
       time,
-      location: activity.contract?.name || 'Ubicación no especificada',
+      location: activity.location || activity.contract?.name || 'Ubicación no especificada',
       type,
       priority: activity.priority,
       status: activity.status,
@@ -169,14 +174,18 @@ export default function ScheduledActivitiesScreen() {
     }
   };
 
-  // Auto-refresh inteligente de actividades
-  const { recordInteraction, hasUpdates, clearUpdates } = useAutoRefresh({
+  // Auto-refresh desactivado, solo refresh manual
+  const { recordInteraction } = useAutoRefresh({
     refreshFunction: loadActivities,
     interval: 120000, // 2 minutos cuando hay actividad
     backgroundInterval: 300000, // 5 minutos cuando no hay actividad
-    enabled: !!user && !isLoading,
+    enabled: false, // Desactivar auto-refresh completamente
     pauseOnInteraction: true,
   });
+  
+  // Estado manual para el indicador de refresh
+  const [hasUpdates, setHasUpdates] = useState(false);
+  const clearUpdates = () => setHasUpdates(false);
 
   const onRefresh = async () => {
     setRefreshing(true);

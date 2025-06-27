@@ -17,6 +17,8 @@ export interface Activity {
   reviewedDate?: string;
   reviewNotes?: string;
   formData?: Record<string, any>;
+  activityName?: string;
+  location?: string;
   createdAt: string;
   updatedAt: string;
   
