@@ -56,7 +56,7 @@ export default function ProfileModal() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
+          <ActivityIndicator size="large" color="#0066cc" />
           <Text style={styles.loadingText}>Cargando perfil...</Text>
         </View>
       </SafeAreaView>
@@ -122,7 +122,7 @@ export default function ProfileModal() {
           style={styles.closeButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="close" size={24} color="#64748B" />
+          <Ionicons name="close" size={24} color="#2c3e50" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Perfil</Text>
         <View style={styles.placeholder} />
@@ -147,27 +147,27 @@ export default function ProfileModal() {
 
           <View style={styles.userDetails}>
             <View style={styles.detailRow}>
-              <Ionicons name="mail-outline" size={16} color="#64748B" />
+              <Ionicons name="mail-outline" size={16} color="#ff6d00" />
               <Text style={styles.detailText}>{user.email}</Text>
             </View>
             {user.phone && (
               <View style={styles.detailRow}>
-                <Ionicons name="call-outline" size={16} color="#64748B" />
+                <Ionicons name="call-outline" size={16} color="#ff6d00" />
                 <Text style={styles.detailText}>{user.phone}</Text>
               </View>
             )}
             <View style={styles.detailRow}>
-              <Ionicons name="id-card-outline" size={16} color="#64748B" />
+              <Ionicons name="id-card-outline" size={16} color="#ff6d00" />
               <Text style={styles.detailText}>ID: {user.id}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Ionicons name="calendar-outline" size={16} color="#64748B" />
+              <Ionicons name="calendar-outline" size={16} color="#ff6d00" />
               <Text style={styles.detailText}>
                 Desde: {formattedJoinDate}
               </Text>
             </View>
             <View style={styles.detailRow}>
-              <Ionicons name="checkmark-circle-outline" size={16} color="#64748B" />
+              <Ionicons name="checkmark-circle-outline" size={16} color="#ff6d00" />
               <Text style={styles.detailText}>
                 Estado: {user.isActive ? 'Activo' : 'Inactivo'}
               </Text>
@@ -184,13 +184,13 @@ export default function ProfileModal() {
               onPress={option.onPress}
             >
               <View style={styles.optionIcon}>
-                <Ionicons name={option.icon as any} size={24} color="#0891B2" />
+                <Ionicons name={option.icon as any} size={24} color="#0066cc" />
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>{option.title}</Text>
                 <Text style={styles.optionDescription}>{option.description}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+              <Ionicons name="chevron-forward" size={20} color="#bdc3c7" />
             </TouchableOpacity>
           ))}
         </View>
@@ -216,7 +216,7 @@ export default function ProfileModal() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7fa',
   },
   header: {
     flexDirection: 'row',
@@ -226,7 +226,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e1e8ed',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   closeButton: {
     padding: 8,
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#2c3e50',
   },
   placeholder: {
     width: 40,
@@ -251,11 +256,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
   },
   avatarContainer: {
     alignItems: 'center',
@@ -265,9 +270,14 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#0891B2',
+    backgroundColor: '#0066cc', // Azul SafetyTech
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0066cc',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   avatarText: {
     fontSize: 24,
@@ -281,18 +291,18 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#2c3e50',
     marginBottom: 4,
   },
   userRole: {
     fontSize: 16,
-    color: '#0891B2',
+    color: '#0066cc', // Azul SafetyTech
     fontWeight: '600',
     marginBottom: 2,
   },
   userCompany: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#7f8c8d',
   },
   userDetails: {
     gap: 12,
@@ -304,7 +314,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#7f8c8d',
     flex: 1,
   },
   optionsContainer: {
@@ -323,14 +333,14 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 4,
   },
   optionIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#e6f3ff', // Azul muy claro SafetyTech
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -341,12 +351,12 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#2c3e50',
     marginBottom: 2,
   },
   optionDescription: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#7f8c8d',
   },
   logoutContainer: {
     marginBottom: 20,
@@ -366,8 +376,8 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 4,
   },
   logoutText: {
     fontSize: 16,
@@ -381,7 +391,7 @@ const styles = StyleSheet.create({
   },
   appInfoText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#95a5a6',
     marginBottom: 4,
   },
   loadingContainer: {
@@ -392,6 +402,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#7f8c8d',
   },
 });

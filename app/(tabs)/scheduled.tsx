@@ -15,6 +15,8 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { activitiesApi, type Activity, documentsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
 
 // Configurar localización en español
 LocaleConfig.locales['es'] = {
@@ -166,6 +168,15 @@ export default function ScheduledActivitiesScreen() {
       setLoading(false);
     }
   };
+
+  // Auto-refresh inteligente de actividades
+  const { recordInteraction, hasUpdates, clearUpdates } = useAutoRefresh({
+    refreshFunction: loadActivities,
+    interval: 120000, // 2 minutos cuando hay actividad
+    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    enabled: !!user && !isLoading,
+    pauseOnInteraction: true,
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -376,6 +387,8 @@ export default function ScheduledActivitiesScreen() {
             colors={['#ff6d00']}
           />
         }
+        onScrollBeginDrag={recordInteraction}
+        onTouchStart={recordInteraction}
       >
         {/* Actividades de hoy */}
         <View style={styles.section}>
@@ -473,7 +486,11 @@ export default function ScheduledActivitiesScreen() {
 
         />
         
-        <ScrollView style={styles.selectedDateActivities}>
+        <ScrollView 
+          style={styles.selectedDateActivities}
+          onScrollBeginDrag={recordInteraction}
+          onTouchStart={recordInteraction}
+        >
           <Text style={styles.selectedDateTitle}>
             Actividades para {createLocalDate(selectedDate).toLocaleDateString('es-ES', { 
               weekday: 'long', 
@@ -522,6 +539,14 @@ export default function ScheduledActivitiesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RefreshIndicator
+        visible={hasUpdates}
+        onRefresh={() => {
+          clearUpdates();
+          onRefresh();
+        }}
+        message="Nuevas actividades disponibles"
+      />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Actividades Programadas</Text>
         <View style={styles.viewToggle}>

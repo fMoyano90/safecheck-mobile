@@ -4,9 +4,13 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
 import { activitiesApi, type Activity, recurringActivitiesApi, type RecurringActivity } from '@/lib/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FormButton from '@/components/activities/FormButton';
 import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
+import { AppState } from 'react-native';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
+import { SubtleRefreshIndicator } from '../../components/ui/SubtleRefreshIndicator';
 
 // Tipos locales para el componente
 type LocalActivity = {
@@ -167,18 +171,23 @@ export default function HomeScreen() {
       setLoadingActivities(true);
       
       // Cargar actividades y actividades recurrentes en paralelo
-      const [upcomingActivities, todayCompleted, recurring] = await Promise.all([
-        activitiesApi.getUpcoming().then(activities => 
-          activities.filter(a => a.status === 'pending')
-        ),
+      const [allActivities, todayCompleted, recurring] = await Promise.all([
+        activitiesApi.getMyActivities({ status: 'pending' }), // Obtener todas las pendientes
         activitiesApi.getTodayCompleted(),
         recurringActivitiesApi.getActive(),
       ]);
       
-      // Convertir las actividades próximas a formato local para mostrar
-      setTodayActivities(upcomingActivities.map(convertToLocalActivity));
+      // Ordenar todas las actividades próximas por fecha/hora
+      const sortedUpcoming = allActivities.sort((a, b) => 
+        new Date(a.assignedDate).getTime() - new Date(b.assignedDate).getTime()
+      );
+      
+      // Convertir las actividades a formato local para mostrar
+      const convertedActivities = sortedUpcoming.map(convertToLocalActivity);
+      
+      setTodayActivities(convertedActivities);
       setCompletedActivities(todayCompleted.map(convertToLocalActivity));
-      setUpcomingActivities(upcomingActivities);
+      setUpcomingActivities(allActivities);
       setRecurringActivities(recurring);
       
     } catch (error) {
@@ -322,14 +331,37 @@ export default function HomeScreen() {
   const pendingActivities = todayActivities.length;
   const completedCount = completedActivities.length;
 
+  // Auto-refresh inteligente de actividades
+  const { recordInteraction, hasUpdates, clearUpdates, pausePolling, resumePolling, isRefreshing } = useAutoRefresh({
+    refreshFunction: loadActivities,
+    interval: 120000, // 2 minutos cuando hay actividad
+    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    enabled: !!user && !isLoading,
+    pauseOnInteraction: true,
+    onDataChanged: () => {
+      console.log('📱 Nuevas actividades disponibles');
+    }
+  });
+
   return (
     <>
+      <RefreshIndicator
+        visible={hasUpdates}
+        onRefresh={() => {
+          clearUpdates();
+          onRefresh();
+        }}
+        message="Nuevas actividades disponibles"
+      />
+      <SubtleRefreshIndicator visible={isRefreshing} />
       <ScrollView 
         style={styles.container}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-    >
+        onScrollBeginDrag={recordInteraction}
+        onTouchStart={recordInteraction}
+      >
       {/* Header */}
       <View style={styles.homeHeader}>
         <Text style={styles.greeting}>¡{getGreeting()}, {getUserName()}!</Text>
@@ -478,7 +510,7 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <FontAwesome name="clock-o" size={20} color="#1565c0" />
-          <Text style={styles.sectionTitle}>Próximas Actividades</Text>
+          <Text style={styles.sectionTitle}>Próximas 4 Actividades</Text>
         </View>
         
         {loadingActivities ? (
@@ -488,10 +520,13 @@ export default function HomeScreen() {
           </View>
         ) : todayActivities.length > 0 ? (
           <>
-            {/* Mostrar actividades próximas organizadas por día */}
-            {todayActivities.slice(0, 5).map((activity, index) => {
+            {/* Mostrar las próximas 4 actividades pendientes */}
+            {todayActivities.slice(0, 4).map((activity) => {
+              // Encontrar la actividad completa correspondiente
+              const fullActivity = upcomingActivities.find(a => a.id === activity.id);
+              
               // Determinar si es hoy, mañana o futuro
-              const activityDate = new Date(upcomingActivities[index]?.assignedDate);
+              const activityDate = fullActivity ? new Date(fullActivity.assignedDate) : new Date();
               const today = new Date();
               const tomorrow = new Date(today);
               tomorrow.setDate(today.getDate() + 1);
@@ -554,15 +589,17 @@ export default function HomeScreen() {
               style={styles.viewAllButton}
               onPress={() => router.push('/scheduled')}
             >
-              <Text style={styles.viewAllText}>Ver todas las programadas</Text>
+              <Text style={styles.viewAllText}>
+                Ver todas las programadas {todayActivities.length > 4 ? `(${todayActivities.length} total)` : ''}
+              </Text>
               <FontAwesome name="arrow-right" size={12} color="#0066cc" />
             </TouchableOpacity>
           </>
         ) : (
           <View style={styles.emptyStateContainer}>
             <FontAwesome name="calendar-o" size={48} color="#94A3B8" />
-            <Text style={styles.emptyStateTitle}>No hay actividades próximas</Text>
-            <Text style={styles.emptyStateText}>Revisa tus actividades programadas o realiza actividades recurrentes</Text>
+            <Text style={styles.emptyStateTitle}>No hay actividades programadas</Text>
+            <Text style={styles.emptyStateText}>No tienes actividades pendientes por realizar</Text>
             <TouchableOpacity 
               style={styles.emptyStateButton}
               onPress={() => router.push('/recurring-activities')}

@@ -17,6 +17,8 @@ import useFormTemplates from '../../hooks/useFormTemplates';
 import { recurringActivitiesApi, type RecurringActivity as APIRecurringActivity } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import FormButton from '@/components/activities/FormButton';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
 
 interface RecurringActivity {
   id: number;
@@ -50,6 +52,8 @@ export default function RecurringActivitiesScreen() {
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+
+
 
   // Función para convertir APIRecurringActivity a RecurringActivity local
   const convertToRecurringActivity = (activity: APIRecurringActivity): RecurringActivity => {
@@ -124,6 +128,15 @@ export default function RecurringActivitiesScreen() {
       setLoading(false);
     }
   };
+
+  // Auto-refresh inteligente de actividades
+  const { recordInteraction, hasUpdates, clearUpdates } = useAutoRefresh({
+    refreshFunction: loadActivities,
+    interval: 120000, // 2 minutos cuando hay actividad
+    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    enabled: !!user && !isLoading,
+    pauseOnInteraction: true,
+  });
 
   const startActivity = async (activity: RecurringActivity) => {
     try {
@@ -335,6 +348,14 @@ export default function RecurringActivitiesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RefreshIndicator
+        visible={hasUpdates}
+        onRefresh={() => {
+          clearUpdates();
+          onRefresh();
+        }}
+        message="Nuevas actividades disponibles"
+      />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Actividades Recurrentes</Text>
         <Text style={styles.headerSubtitle}>
@@ -357,6 +378,8 @@ export default function RecurringActivitiesScreen() {
             colors={['#0891B2']}
           />
         }
+        onScrollBeginDrag={recordInteraction}
+        onTouchStart={recordInteraction}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
