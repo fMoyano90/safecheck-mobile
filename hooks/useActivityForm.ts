@@ -8,6 +8,11 @@ import {
   type ActivityTemplate, 
   type DocumentResponse 
 } from '@/lib/api';
+import { 
+  offlineDocumentsApi, 
+  offlineStorage,
+  useOfflineStatus 
+} from '@/lib/offline';
 
 interface UseActivityFormProps {
   activityId: number;
@@ -32,6 +37,9 @@ export const useActivityForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Hook para estado offline
+  const { isOnline, canMakeRequests } = useOfflineStatus();
 
   // Cargar template al montar el componente
   useEffect(() => {
@@ -43,12 +51,67 @@ export const useActivityForm = ({
       setIsLoading(true);
       setError(null);
       
-      const templateData = await documentsApi.getTemplate(activityId, activityType);
+      // Intentar cargar desde sistema offline primero
+      let templateData: ActivityTemplate | null = null;
+      
+      // Si hay conexión, usar API normal, sino usar sistema offline
+      if (canMakeRequests) {
+        try {
+          templateData = await documentsApi.getTemplate(activityId, activityType);
+          
+          // Guardar template para uso offline
+          const templates = await offlineStorage.getTemplates();
+          const existingIndex = templates.findIndex(t => 
+            t.activityId === activityId && t.activityType === activityType
+          );
+          
+          const templateToSave = {
+            activityId,
+            activityType,
+            ...templateData
+          };
+          
+          if (existingIndex !== -1) {
+            templates[existingIndex] = templateToSave;
+          } else {
+            templates.push(templateToSave);
+          }
+          
+          await offlineStorage.saveTemplates(templates);
+          console.log('📱 Template guardado para uso offline');
+          
+        } catch (error) {
+          console.warn('⚠️ Error con API online, intentando offline:', error);
+          // Si falla la API online, intentar offline
+          templateData = await offlineDocumentsApi.getTemplate(activityId, activityType);
+        }
+      } else {
+        // Sin conexión, usar solo sistema offline
+        console.log('📱 Modo offline: cargando template desde almacenamiento local');
+        templateData = await offlineDocumentsApi.getTemplate(activityId, activityType);
+      }
+      
+      if (!templateData) {
+        throw new Error('No se encontró el template ni online ni offline');
+      }
+      
       setTemplate(templateData);
+      
+      // Cargar borrador si existe
+      const draftData = await offlineStorage.getDraftForm(activityId);
+      if (draftData) {
+        console.log('📝 Borrador encontrado para actividad', activityId);
+        // Aquí podrías emitir un evento o callback para cargar el borrador en el formulario
+      }
+      
     } catch (error) {
-      console.error('Error cargando template:', error);
-      setError('Error al cargar el formulario');
-      Alert.alert('Error', 'No se pudo cargar el formulario');
+      console.error('❌ Error cargando template:', error);
+      const errorMessage = !canMakeRequests 
+        ? 'No hay plantilla disponible offline. Conéctate a internet para descargarla.'
+        : 'Error al cargar el formulario';
+      
+      setError(errorMessage);
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -118,12 +181,19 @@ export const useActivityForm = ({
         completedAt: new Date().toISOString(),
       };
 
-      // Enviar formulario
-      const result = await documentsApi.createFromActivity(documentData);
+      // Usar sistema offline que maneja automáticamente la conectividad
+      const result = await offlineDocumentsApi.createFromActivity(documentData);
+      
+      // Limpiar borrador si existe
+      await offlineStorage.deleteDraftForm(activityId);
+      
+      const successMessage = canMakeRequests 
+        ? 'Formulario enviado correctamente'
+        : 'Formulario guardado offline. Se enviará cuando recuperes la conexión';
       
       Alert.alert(
         'Éxito', 
-        'Formulario enviado correctamente', 
+        successMessage, 
         [{ 
           text: 'OK',
           onPress: () => {
@@ -137,18 +207,28 @@ export const useActivityForm = ({
         }]
       );
 
-      console.log('Documento creado:', result);
+      console.log('📄 Documento procesado:', result);
       
     } catch (error) {
-      console.error('Error enviando formulario:', error);
+      console.error('❌ Error enviando formulario:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       setError(errorMessage);
       
-      Alert.alert(
-        'Error', 
-        'No se pudo enviar el formulario. Inténtalo de nuevo.',
-        [{ text: 'OK' }]
-      );
+      // Guardar como borrador en caso de error
+      try {
+        await offlineStorage.saveDraftForm(activityId, formData);
+        Alert.alert(
+          'Error', 
+          'No se pudo enviar el formulario, pero se guardó como borrador. Puedes intentar de nuevo más tarde.',
+          [{ text: 'OK' }]
+        );
+      } catch (draftError) {
+        Alert.alert(
+          'Error', 
+          'No se pudo enviar el formulario. Inténtalo de nuevo.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -158,20 +238,19 @@ export const useActivityForm = ({
     try {
       setError(null);
 
-      const documentData = await processFormData(formData);
+      // Guardar borrador usando el sistema offline
+      await offlineStorage.saveDraftForm(activityId, formData);
       
-      // Guardar como draft (esto requeriría un endpoint específico o localStorage)
-      // Por ahora solo mostramos un mensaje de confirmación
       Alert.alert(
         'Guardado', 
-        'Progreso guardado localmente',
+        'Progreso guardado localmente como borrador',
         [{ text: 'OK' }]
       );
 
-      console.log('Datos guardados:', documentData);
+      console.log('📝 Borrador guardado para actividad:', activityId);
       
     } catch (error) {
-      console.error('Error guardando formulario:', error);
+      console.error('❌ Error guardando borrador:', error);
       Alert.alert(
         'Error', 
         'No se pudo guardar el progreso',

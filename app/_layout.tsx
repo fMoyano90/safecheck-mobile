@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider } from '@/contexts/auth-context';
+import { OfflineSystem } from '@/lib/offline';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -36,6 +37,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      
+      // Inicializar sistema offline
+      OfflineSystem.initialize()
+        .then(() => {
+          console.log('✅ Sistema offline listo');
+        })
+        .catch((error) => {
+          console.error('❌ Error inicializando sistema offline:', error);
+        });
     }
   }, [loaded]);
 
