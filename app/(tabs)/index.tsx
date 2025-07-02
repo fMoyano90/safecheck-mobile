@@ -12,6 +12,7 @@ import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
 import { SubtleRefreshIndicator } from '../../components/ui/SubtleRefreshIndicator';
 import { documentsApi } from '@/lib/api';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 // Tipos locales para el componente
 type LocalActivity = {
@@ -377,12 +378,11 @@ export default function HomeScreen() {
   const completedCount = completedActivities.length;
 
   // Auto-refresh inteligente de actividades
-  const { recordInteraction, hasUpdates, clearUpdates, pausePolling, resumePolling, isRefreshing } = useAutoRefresh({
+  const { hasUpdates, clearUpdates, pausePolling, resumePolling, isRefreshing } = useAutoRefresh({
     refreshFunction: loadActivities,
-    interval: 120000, // 2 minutos cuando hay actividad
-    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    interval: 120000, // 2 minutos
     enabled: !!user && !isLoading,
-    pauseOnInteraction: true,
+    manualRefreshOnly: true, // Solo mostrar banner por notificaciones push
     onDataChanged: () => {
       console.log('📱 Nuevas actividades disponibles');
     }
@@ -404,16 +404,19 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        onScrollBeginDrag={recordInteraction}
-        onTouchStart={recordInteraction}
       >
       {/* Header */}
       <View style={styles.homeHeader}>
-        <Text style={styles.greeting}>¡{getGreeting()}, {getUserName()}!</Text>
-        <Text style={styles.dateText}>{dateString}</Text>
-        {user?.role && (
-          <Text style={styles.roleText}>{user.role}</Text>
-        )}
+        <View style={styles.headerContent}>
+          <View style={styles.headerText}>
+            <Text style={styles.greeting}>¡{getGreeting()}, {getUserName()}!</Text>
+            <Text style={styles.dateText}>{dateString}</Text>
+            {user?.role && (
+              <Text style={styles.roleText}>{user.role}</Text>
+            )}
+          </View>
+          <NotificationBell />
+        </View>
       </View>
 
       {/* Estadísticas del día */}
@@ -716,6 +719,14 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 50,
     paddingBottom: 40,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerText: {
+    flex: 1,
   },
   greeting: {
     fontSize: 24,

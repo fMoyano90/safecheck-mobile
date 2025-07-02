@@ -215,4 +215,26 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     
     throw new ApiError(500, 'Error interno del servidor', error);
   }
-} 
+}
+
+// Cliente API simplificado para compatibilidad
+export const apiClient = {
+  get: async <T>(endpoint: string) => {
+    const data = await apiRequest<T>(endpoint, { method: 'GET' });
+    return { data: { success: true, data } };
+  },
+  post: async <T>(endpoint: string, body?: any) => {
+    const data = await apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data: { success: true, data, message: 'Operación exitosa' } };
+  },
+  delete: async <T>(endpoint: string, options?: { data?: any }) => {
+    const data = await apiRequest<T>(endpoint, {
+      method: 'DELETE',
+      body: options?.data ? JSON.stringify(options.data) : undefined,
+    });
+    return { data: { success: true, data, message: 'Operación exitosa' } };
+  },
+};

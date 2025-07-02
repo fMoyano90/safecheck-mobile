@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider } from '@/contexts/auth-context';
+import { NotificationProvider } from '@/contexts/notification-context';
 import { OfflineSystem } from '@/lib/offline';
 
 export {
@@ -61,13 +62,17 @@ function RootLayoutNav() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-        </Stack>
-      </ThemeProvider>
+      <NotificationProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="notifications" options={{ headerShown: false }} />
+            <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
+          </Stack>
+        </ThemeProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -1,82 +1,56 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { notificationService } from '../lib/notifications/notification-service';
 
 interface UseAutoRefreshOptions {
   refreshFunction: () => Promise<void>;
   interval?: number; // en milisegundos
   enabled?: boolean;
   onDataChanged?: () => void; // Callback cuando hay cambios
-  backgroundInterval?: number; // Intervalo más largo cuando no hay interacción
-  pauseOnInteraction?: boolean; // Pausar cuando el usuario está interactuando
+  manualRefreshOnly?: boolean; // Solo permitir refresh manual
 }
 
 export const useAutoRefresh = ({ 
   refreshFunction, 
-  interval = 120000, // 2 minutos por defecto (era 30 segundos)
-  backgroundInterval = 300000, // 5 minutos cuando no hay interacción
+  interval = 300000, // 5 minutos por defecto (reducido de polling agresivo)
   enabled = true,
   onDataChanged,
-  pauseOnInteraction = true
+  manualRefreshOnly = false // Nueva opción para deshabilitar auto-refresh
 }: UseAutoRefreshOptions) => {
   const pollingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastInteractionTime = useRef<number>(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasUpdates, setHasUpdates] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Detectar interacción del usuario
-  const recordInteraction = () => {
-    lastInteractionTime.current = Date.now();
-    if (isPaused && pauseOnInteraction) {
-      setIsPaused(false);
-      startPolling();
-    }
-  };
-
-  // Determinar qué intervalo usar basado en la actividad del usuario
-  const getActiveInterval = () => {
-    const timeSinceLastInteraction = Date.now() - lastInteractionTime.current;
-    const fiveMinutes = 5 * 60 * 1000;
-    
-    // Si han pasado más de 5 minutos sin interacción, usar intervalo más largo
-    return timeSinceLastInteraction > fiveMinutes ? backgroundInterval : interval;
-  };
-
   const startPolling = () => {
-    if (!enabled || isPaused) return;
+    if (!enabled || isPaused || manualRefreshOnly) return;
     
     if (pollingTimer.current) {
       clearInterval(pollingTimer.current);
     }
     
-    const currentInterval = getActiveInterval();
-    
     pollingTimer.current = setInterval(async () => {
       try {
-        // No refrescar si el usuario está interactuando activamente
-        const timeSinceLastInteraction = Date.now() - lastInteractionTime.current;
-        if (pauseOnInteraction && timeSinceLastInteraction < 10000) { // 10 segundos
-          return;
-        }
-
         setIsRefreshing(true);
         await refreshFunction();
         
-        // Marcar que hay actualizaciones disponibles
-        setHasUpdates(true);
+        // NO marcar automáticamente que hay actualizaciones
+        // Solo se activará por notificaciones push
         onDataChanged?.();
       } catch (error) {
         console.error('Error in auto-refresh:', error);
       } finally {
         setIsRefreshing(false);
-        
-        // Reajustar el intervalo si es necesario
-        const newInterval = getActiveInterval();
-        if (newInterval !== currentInterval) {
-          startPolling();
-        }
       }
-    }, currentInterval);
+    }, interval);
+  };
+
+  // Función para activar el banner cuando llegue una notificación de actividad
+  const handleActivityNotification = (notification: any) => {
+    if (notification.type === 'activity' || notification.title?.includes('actividad') || notification.title?.includes('Actividad')) {
+      setHasUpdates(true);
+      onDataChanged?.();
+    }
   };
 
   const stopPolling = () => {
@@ -102,7 +76,6 @@ export const useAutoRefresh = ({
     try {
       setIsRefreshing(true);
       setHasUpdates(false); // Limpiar el indicador de actualizaciones
-      recordInteraction(); // Registrar que el usuario interactuó
       await refreshFunction();
     } catch (error) {
       console.error('Error in manual refresh:', error);
@@ -111,28 +84,31 @@ export const useAutoRefresh = ({
     }
   };
 
-  // Iniciar polling cuando el hook se monta
+  // Iniciar polling cuando el hook se monta (solo si no es manual only)
   useEffect(() => {
-    if (enabled) {
+    if (enabled && !manualRefreshOnly) {
       startPolling();
     }
-    return () => stopPolling();
-  }, [enabled, interval, backgroundInterval]);
 
-  // Manejar cambios en el estado de la app
+    // Configurar listener para notificaciones de actividades
+    notificationService.on('notification_received', handleActivityNotification);
+
+    return () => {
+      stopPolling();
+      notificationService.off('notification_received', handleActivityNotification);
+    };
+  }, [enabled, interval, manualRefreshOnly]);
+
+  // Manejar cambios en el estado de la app de forma más conservadora
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active') {
-        recordInteraction();
-        if (enabled && !isPaused) {
+        // Solo reiniciar polling si estaba habilitado y no es manual only
+        if (enabled && !isPaused && !manualRefreshOnly) {
           startPolling();
-          // Solo refrescar si han pasado más de 2 minutos desde la última vez
-          const timeSinceLastInteraction = Date.now() - lastInteractionTime.current;
-          if (timeSinceLastInteraction > 120000) { // 2 minutos
-            manualRefresh();
-          }
         }
       } else {
+        // Pausar polling cuando la app va al background
         stopPolling();
       }
     };
@@ -141,7 +117,7 @@ export const useAutoRefresh = ({
     return () => {
       appStateSubscription.remove();
     };
-  }, [enabled, refreshFunction, isPaused]);
+  }, [enabled, isPaused, manualRefreshOnly]);
 
   return {
     startPolling,
@@ -149,11 +125,10 @@ export const useAutoRefresh = ({
     pausePolling,
     resumePolling,
     manualRefresh,
-    recordInteraction,
     isPolling: pollingTimer.current !== null,
     isRefreshing,
     hasUpdates,
     isPaused,
     clearUpdates: () => setHasUpdates(false),
   };
-}; 
+};

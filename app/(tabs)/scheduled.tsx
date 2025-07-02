@@ -175,12 +175,10 @@ export default function ScheduledActivitiesScreen() {
   };
 
   // Auto-refresh desactivado, solo refresh manual
-  const { recordInteraction } = useAutoRefresh({
+  const {} = useAutoRefresh({
     refreshFunction: loadActivities,
-    interval: 120000, // 2 minutos cuando hay actividad
-    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    interval: 120000, // 2 minutos
     enabled: false, // Desactivar auto-refresh completamente
-    pauseOnInteraction: true,
   });
   
   // Estado manual para el indicador de refresh
@@ -396,8 +394,7 @@ export default function ScheduledActivitiesScreen() {
             colors={['#ff6d00']}
           />
         }
-        onScrollBeginDrag={recordInteraction}
-        onTouchStart={recordInteraction}
+
       >
         {/* Actividades de hoy */}
         <View style={styles.section}>
@@ -497,8 +494,7 @@ export default function ScheduledActivitiesScreen() {
         
         <ScrollView 
           style={styles.selectedDateActivities}
-          onScrollBeginDrag={recordInteraction}
-          onTouchStart={recordInteraction}
+
         >
           <Text style={styles.selectedDateTitle}>
             Actividades para {createLocalDate(selectedDate).toLocaleDateString('es-ES', { 
@@ -793,4 +789,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-}); 
+});

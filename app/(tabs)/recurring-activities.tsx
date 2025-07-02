@@ -130,12 +130,10 @@ export default function RecurringActivitiesScreen() {
   };
 
   // Auto-refresh inteligente de actividades
-  const { recordInteraction, hasUpdates, clearUpdates } = useAutoRefresh({
+  const { hasUpdates, clearUpdates } = useAutoRefresh({
     refreshFunction: loadActivities,
-    interval: 120000, // 2 minutos cuando hay actividad
-    backgroundInterval: 300000, // 5 minutos cuando no hay actividad
+    interval: 120000, // 2 minutos
     enabled: !!user && !isLoading,
-    pauseOnInteraction: true,
   });
 
   const startActivity = async (activity: RecurringActivity) => {
@@ -378,8 +376,7 @@ export default function RecurringActivitiesScreen() {
             colors={['#0891B2']}
           />
         }
-        onScrollBeginDrag={recordInteraction}
-        onTouchStart={recordInteraction}
+
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -594,4 +591,4 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-}); 
+});
