@@ -33,7 +33,7 @@ export default function FormDemoScreen() {
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: 'Cargando formulario...' }} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
+          <ActivityIndicator size="large" color="#ff6d00" />
           <Text style={styles.loadingText}>Cargando formulario...</Text>
         </View>
       </SafeAreaView>

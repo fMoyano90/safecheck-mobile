@@ -56,7 +56,7 @@ export default function ProfileModal() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066cc" />
+          <ActivityIndicator size="large" color="#ff6d00" />
           <Text style={styles.loadingText}>Cargando perfil...</Text>
         </View>
       </SafeAreaView>

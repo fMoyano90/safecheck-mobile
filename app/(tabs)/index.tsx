@@ -288,7 +288,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0891B2" />
+        <ActivityIndicator size="large" color="#ff6d00" />
         <Text style={styles.loadingText}>Cargando dashboard...</Text>
       </View>
     );

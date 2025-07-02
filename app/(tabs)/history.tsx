@@ -12,220 +12,104 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/contexts/auth-context';
+import { documentsApi, type DocumentResponse } from '@/lib/api';
 
-interface CompletedActivity {
-  id: string;
-  title: string;
-  description?: string;
-  type: string;
-  category: string;
-  completedDate: string;
-  completedTime: string;
-  location: string;
-  duration: number;
-  priority: 'low' | 'medium' | 'high';
-  assignedBy?: string;
-  observations?: string;
-  hasPhotos: boolean;
-  hasSigned: boolean;
-  score?: number;
-}
-
-type FilterType = 'all' | 'today' | 'week' | 'month';
+type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
 
 export default function HistoryScreen() {
-  const [activities, setActivities] = useState<CompletedActivity[]>([]);
-  const [filteredActivities, setFilteredActivities] = useState<CompletedActivity[]>([]);
+  const { user, isLoading } = useAuth();
+  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const [filteredDocuments, setFilteredDocuments] = useState<DocumentResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
-  const [selectedActivity, setSelectedActivity] = useState<CompletedActivity | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentResponse | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Datos mockup para actividades completadas
-  const mockActivities: CompletedActivity[] = [
-    {
-      id: '1',
-      title: 'Inspección de Seguridad Área A',
-      description: 'Revisión completa de protocolos de seguridad',
-      type: 'inspection',
-      category: 'Inspecciones',
-      completedDate: '2024-01-15',
-      completedTime: '09:30',
-      location: 'Planta Principal - Área A',
-      duration: 65,
-      priority: 'high',
-      assignedBy: 'Supervisor Carlos Mendez',
-      observations: 'Se encontraron algunas deficiencias menores que fueron corregidas.',
-      hasPhotos: true,
-      hasSigned: true,
-      score: 85,
-    },
-    {
-      id: '2',
-      title: 'Verificación de EPP',
-      description: 'Control del estado y uso correcto del equipo de protección personal',
-      type: 'verification',
-      category: 'EPP',
-      completedDate: '2024-01-15',
-      completedTime: '11:45',
-      location: 'Área de Vestuarios',
-      duration: 15,
-      priority: 'medium',
-      assignedBy: 'Jefe de Seguridad Ana García',
-      observations: 'Todo el personal cumple con el uso correcto del EPP.',
-      hasPhotos: true,
-      hasSigned: false,
-      score: 95,
-    },
-    {
-      id: '3',
-      title: 'Limpieza y Orden (5S)',
-      description: 'Verificación del cumplimiento de las 5S en el área de trabajo',
-      type: 'evaluation',
-      category: 'Orden y Limpieza',
-      completedDate: '2024-01-14',
-      completedTime: '16:20',
-      location: 'Área de Producción B',
-      duration: 25,
-      priority: 'low',
-      assignedBy: 'Coordinador de Calidad Luis Morales',
-      observations: 'Excelente cumplimiento de los estándares 5S.',
-      hasPhotos: true,
-      hasSigned: true,
-      score: 92,
-    },
-    {
-      id: '4',
-      title: 'Capacitación en Primeros Auxilios',
-      description: 'Sesión de entrenamiento en técnicas básicas de primeros auxilios',
-      type: 'training',
-      category: 'Capacitaciones',
-      completedDate: '2024-01-12',
-      completedTime: '14:00',
-      location: 'Sala de Conferencias A',
-      duration: 120,
-      priority: 'medium',
-      assignedBy: 'Especialista en Seguridad María González',
-      observations: 'Participación activa y comprensión completa de los procedimientos.',
-      hasPhotos: false,
-      hasSigned: true,
-      score: 88,
-    },
-    {
-      id: '5',
-      title: 'Inspección de Herramientas',
-      description: 'Revisión del estado y funcionamiento de herramientas de trabajo',
-      type: 'inspection',
-      category: 'Herramientas',
-      completedDate: '2024-01-10',
-      completedTime: '08:15',
-      location: 'Almacén de Herramientas',
-      duration: 45,
-      priority: 'medium',
-      assignedBy: 'Técnico en Seguridad Pedro López',
-      observations: 'Se retiraron 3 herramientas defectuosas para mantenimiento.',
-      hasPhotos: true,
-      hasSigned: true,
-      score: 90,
-    },
-  ];
+  useEffect(() => {
+    if (user && !isLoading) {
+      loadDocuments();
+    }
+  }, [user, isLoading]);
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    filterDocuments();
+  }, [documents, selectedFilter]);
 
-  useEffect(() => {
-    filterActivities();
-  }, [activities, selectedFilter]);
-
-  const loadActivities = async () => {
+  const loadDocuments = async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setActivities(mockActivities);
+      const myDocuments = await documentsApi.getMyDocuments();
+      setDocuments(myDocuments);
     } catch (err) {
-      console.error('Error loading activities:', err);
+      console.error('Error loading documents:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterActivities = () => {
-    const now = new Date();
-    let filtered = activities;
+  const filterDocuments = () => {
+    let filtered = documents;
 
-    switch (selectedFilter) {
-      case 'today':
-        const today = now.toISOString().split('T')[0];
-        filtered = activities.filter(activity => activity.completedDate === today);
-        break;
-      case 'week':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filtered = activities.filter(activity => 
-          new Date(activity.completedDate) >= weekAgo
-        );
-        break;
-      case 'month':
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filtered = activities.filter(activity => 
-          new Date(activity.completedDate) >= monthAgo
-        );
-        break;
-      default:
-        filtered = activities;
+    if (selectedFilter !== 'all') {
+      filtered = documents.filter(doc => doc.status === selectedFilter);
     }
 
-    setFilteredActivities(filtered.sort((a, b) => 
-      new Date(b.completedDate + ' ' + b.completedTime).getTime() - 
-      new Date(a.completedDate + ' ' + a.completedTime).getTime()
-    ));
+    setFilteredDocuments(filtered);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadActivities();
+    await loadDocuments();
     setRefreshing(false);
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'inspection': return 'search';
-      case 'training': return 'school';
-      case 'evaluation': return 'document-text';
-      case 'verification': return 'checkmark-circle';
-      default: return 'calendar';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return '#ff6d00'; // Naranja SafetyTech - Pendiente de revisión
+      case 'approved':
+        return '#4CAF50'; // Verde - Aprobado
+      case 'rejected':
+        return '#F44336'; // Rojo - Rechazado
+      case 'draft':
+        return '#9E9E9E'; // Gris - Borrador
+      default:
+        return '#9E9E9E';
     }
   };
 
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'inspection': return '#2196F3';
-      case 'training': return '#9C27B0';
-      case 'evaluation': return '#FF5722';
-      case 'verification': return '#4CAF50';
-      default: return '#9E9E9E';
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente de Revisión';
+      case 'approved':
+        return 'Aprobado';
+      case 'rejected':
+        return 'Rechazado';
+      case 'draft':
+        return 'Borrador';
+      default:
+        return status;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#F44336';
-      case 'medium': return '#FF9800';
-      case 'low': return '#4CAF50';
-      default: return '#9E9E9E';
+  const getActivityTypeText = (activityType?: string) => {
+    switch (activityType) {
+      case 'scheduled':
+        return 'Programada';
+      case 'recurring':
+        return 'Recurrente';
+      default:
+        return 'N/A';
     }
   };
 
-  const getScoreColor = (score?: number) => {
-    if (!score) return '#9E9E9E';
-    if (score >= 90) return '#4CAF50';
-    if (score >= 70) return '#FF9800';
-    return '#F44336';
-  };
-
-  const openActivityDetail = (activity: CompletedActivity) => {
-    setSelectedActivity(activity);
+  const openDocumentDetail = (document: DocumentResponse) => {
+    setSelectedDocument(document);
     setShowDetailModal(true);
   };
 
@@ -247,59 +131,60 @@ export default function HistoryScreen() {
     </TouchableOpacity>
   );
 
-  const renderActivity = ({ item }: { item: CompletedActivity }) => (
+  const renderDocument = ({ item }: { item: DocumentResponse }) => (
     <TouchableOpacity
-      style={styles.activityCard}
-      onPress={() => openActivityDetail(item)}
+      style={styles.documentCard}
+      onPress={() => openDocumentDetail(item)}
     >
-      <View style={styles.activityHeader}>
-        <View style={styles.activityInfo}>
-          <Text style={styles.activityTitle}>{item.title}</Text>
-          <Text style={styles.activityCategory}>{item.category}</Text>
+      <View style={styles.documentHeader}>
+        <View style={styles.documentInfo}>
+          <Text style={styles.documentTitle}>{item.title}</Text>
+          <Text style={styles.documentDescription}>
+            {item.description || 'Sin descripción'}
+          </Text>
         </View>
-        <View style={styles.activityMeta}>
-          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
-            <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
-          </View>
-          {item.score && (
-            <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(item.score) }]}>
-              <Text style={styles.scoreText}>{item.score}%</Text>
-            </View>
-          )}
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
         </View>
       </View>
 
-      <View style={styles.activityDetails}>
+      <View style={styles.documentDetails}>
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={14} color="#64748B" />
           <Text style={styles.detailText}>
-            {new Date(item.completedDate).toLocaleDateString('es-ES')} a las {item.completedTime}
+            {new Date(item.createdAt).toLocaleDateString('es-ES')} a las{' '}
+            {new Date(item.createdAt).toLocaleTimeString('es-ES', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
           </Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Ionicons name="location-outline" size={14} color="#64748B" />
-          <Text style={styles.detailText}>{item.location}</Text>
+          <Ionicons name="document-text-outline" size={14} color="#64748B" />
+          <Text style={styles.detailText}>
+            Tipo: {getActivityTypeText(item.activityType)}
+          </Text>
         </View>
 
-        <View style={styles.detailRow}>
-          <Ionicons name="time-outline" size={14} color="#64748B" />
-          <Text style={styles.detailText}>{item.duration} minutos</Text>
-        </View>
+        {item.activityId && (
+          <View style={styles.detailRow}>
+            <Ionicons name="link-outline" size={14} color="#64748B" />
+            <Text style={styles.detailText}>
+              Actividad #{item.activityId}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.activityFooter}>
-        <View style={styles.activityFeatures}>
-          <Ionicons 
-            name={getActivityIcon(item.type)} 
-            size={16} 
-            color={getActivityColor(item.type)} 
-          />
-          {item.hasPhotos && (
-            <Ionicons name="camera" size={14} color="#0891B2" />
+      <View style={styles.documentFooter}>
+        <View style={styles.documentFeatures}>
+          <Ionicons name="document-text" size={16} color="#0066cc" />
+          {item.metadata?.hasPhotos && (
+            <Ionicons name="camera" size={14} color="#0066cc" />
           )}
-          {item.hasSigned && (
-            <Ionicons name="create" size={14} color="#0891B2" />
+          {item.metadata?.hasSignatures && (
+            <Ionicons name="create" size={14} color="#0066cc" />
           )}
         </View>
         
@@ -309,7 +194,7 @@ export default function HistoryScreen() {
   );
 
   const renderDetailModal = () => {
-    if (!selectedActivity) return null;
+    if (!selectedDocument) return null;
 
     return (
       <Modal
@@ -326,20 +211,27 @@ export default function HistoryScreen() {
             >
               <Ionicons name="close" size={24} color="#64748B" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Detalle de Actividad</Text>
+            <Text style={styles.modalTitle}>Detalle del Documento</Text>
             <View style={styles.placeholder} />
           </View>
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.detailSection}>
-              <Text style={styles.detailTitle}>{selectedActivity.title}</Text>
-              <Text style={styles.detailSubtitle}>{selectedActivity.category}</Text>
+              <Text style={styles.detailTitle}>{selectedDocument.title}</Text>
+              <View style={[
+                styles.statusBadge, 
+                { backgroundColor: getStatusColor(selectedDocument.status) }
+              ]}>
+                <Text style={styles.statusText}>
+                  {getStatusText(selectedDocument.status)}
+                </Text>
+              </View>
             </View>
 
-            {selectedActivity.description && (
+            {selectedDocument.description && (
               <View style={styles.detailSection}>
                 <Text style={styles.sectionLabel}>Descripción</Text>
-                <Text style={styles.sectionText}>{selectedActivity.description}</Text>
+                <Text style={styles.sectionText}>{selectedDocument.description}</Text>
               </View>
             )}
 
@@ -347,84 +239,89 @@ export default function HistoryScreen() {
               <Text style={styles.sectionLabel}>Información General</Text>
               <View style={styles.infoGrid}>
                 <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Fecha Completada</Text>
+                  <Text style={styles.infoLabel}>Fecha Enviado</Text>
                   <Text style={styles.infoValue}>
-                    {new Date(selectedActivity.completedDate).toLocaleDateString('es-ES')}
+                    {new Date(selectedDocument.createdAt).toLocaleDateString('es-ES')}
                   </Text>
                 </View>
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>Hora</Text>
-                  <Text style={styles.infoValue}>{selectedActivity.completedTime}</Text>
+                  <Text style={styles.infoValue}>
+                    {new Date(selectedDocument.createdAt).toLocaleTimeString('es-ES', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Duración</Text>
-                  <Text style={styles.infoValue}>{selectedActivity.duration} min</Text>
+                  <Text style={styles.infoLabel}>Tipo de Actividad</Text>
+                  <Text style={styles.infoValue}>
+                    {getActivityTypeText(selectedDocument.activityType)}
+                  </Text>
                 </View>
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Ubicación</Text>
-                  <Text style={styles.infoValue}>{selectedActivity.location}</Text>
-                </View>
+                {selectedDocument.activityId && (
+                  <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>ID Actividad</Text>
+                    <Text style={styles.infoValue}>#{selectedDocument.activityId}</Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            {selectedActivity.assignedBy && (
+            {selectedDocument.rejectionReason && (
               <View style={styles.detailSection}>
-                <Text style={styles.sectionLabel}>Asignado por</Text>
-                <Text style={styles.sectionText}>{selectedActivity.assignedBy}</Text>
+                <Text style={styles.sectionLabel}>Motivo de Rechazo</Text>
+                <Text style={[styles.sectionText, { color: '#F44336' }]}>
+                  {selectedDocument.rejectionReason}
+                </Text>
               </View>
             )}
 
-            {selectedActivity.observations && (
+            {selectedDocument.metadata && (
               <View style={styles.detailSection}>
-                <Text style={styles.sectionLabel}>Observaciones</Text>
-                <Text style={styles.sectionText}>{selectedActivity.observations}</Text>
+                <Text style={styles.sectionLabel}>Características</Text>
+                <View style={styles.featuresContainer}>
+                  <View style={styles.featureItem}>
+                    <Ionicons 
+                      name={selectedDocument.metadata.hasPhotos ? "camera" : "camera-outline"} 
+                      size={20} 
+                      color={selectedDocument.metadata.hasPhotos ? "#0066cc" : "#94A3B8"} 
+                    />
+                    <Text style={[
+                      styles.featureText,
+                      selectedDocument.metadata.hasPhotos && styles.activeFeature
+                    ]}>
+                      Fotos {selectedDocument.metadata.hasPhotos ? 'incluidas' : 'no incluidas'}
+                    </Text>
+                  </View>
+                  <View style={styles.featureItem}>
+                    <Ionicons 
+                      name={selectedDocument.metadata.hasSignatures ? "create" : "create-outline"} 
+                      size={20} 
+                      color={selectedDocument.metadata.hasSignatures ? "#0066cc" : "#94A3B8"} 
+                    />
+                    <Text style={[
+                      styles.featureText,
+                      selectedDocument.metadata.hasSignatures && styles.activeFeature
+                    ]}>
+                      Firma {selectedDocument.metadata.hasSignatures ? 'incluida' : 'no incluida'}
+                    </Text>
+                  </View>
+                </View>
               </View>
             )}
 
-            <View style={styles.detailSection}>
-              <Text style={styles.sectionLabel}>Características</Text>
-              <View style={styles.featuresContainer}>
-                <View style={styles.featureItem}>
-                  <Ionicons 
-                    name={selectedActivity.hasPhotos ? "camera" : "camera-outline"} 
-                    size={20} 
-                    color={selectedActivity.hasPhotos ? "#0891B2" : "#94A3B8"} 
-                  />
-                  <Text style={[
-                    styles.featureText,
-                    selectedActivity.hasPhotos && styles.activeFeature
-                  ]}>
-                    Fotos {selectedActivity.hasPhotos ? 'incluidas' : 'no requeridas'}
-                  </Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons 
-                    name={selectedActivity.hasSigned ? "create" : "create-outline"} 
-                    size={20} 
-                    color={selectedActivity.hasSigned ? "#0891B2" : "#94A3B8"} 
-                  />
-                  <Text style={[
-                    styles.featureText,
-                    selectedActivity.hasSigned && styles.activeFeature
-                  ]}>
-                    Firma {selectedActivity.hasSigned ? 'realizada' : 'no requerida'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {selectedActivity.score && (
+            {selectedDocument.fields && Object.keys(selectedDocument.fields).length > 0 && (
               <View style={styles.detailSection}>
-                <Text style={styles.sectionLabel}>Puntuación</Text>
-                <View style={styles.scoreContainer}>
-                  <Text style={[styles.scoreValue, { color: getScoreColor(selectedActivity.score) }]}>
-                    {selectedActivity.score}%
-                  </Text>
-                  <Text style={styles.scoreDescription}>
-                    {selectedActivity.score >= 90 ? 'Excelente' : 
-                     selectedActivity.score >= 70 ? 'Bueno' : 'Necesita mejora'}
-                  </Text>
-                </View>
+                <Text style={styles.sectionLabel}>Datos del Formulario</Text>
+                {Object.entries(selectedDocument.fields).map(([key, value]) => (
+                  <View key={key} style={styles.fieldRow}>
+                    <Text style={styles.fieldLabel}>{key}:</Text>
+                    <Text style={styles.fieldValue}>
+                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    </Text>
+                  </View>
+                ))}
               </View>
             )}
           </ScrollView>
@@ -433,56 +330,85 @@ export default function HistoryScreen() {
     );
   };
 
-  if (loading) {
+  // Mostrar loading si el usuario se está autenticando
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
-          <Text style={styles.loadingText}>Cargando historial...</Text>
+          <ActivityIndicator size="large" color="#ff6d00" />
+          <Text style={styles.loadingText}>Verificando autenticación...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  // Si no hay usuario autenticado, mostrar mensaje
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>
+            Necesitas iniciar sesión para ver tu historial de documentos
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const getFilterCount = (filter: FilterType) => {
+    if (filter === 'all') return documents.length;
+    return documents.filter(doc => doc.status === filter).length;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Historial de Actividades</Text>
+        <Text style={styles.headerTitle}>Historial de Documentos</Text>
         <Text style={styles.headerSubtitle}>
-          Actividades que has completado ({filteredActivities.length})
+          Formularios que has enviado ({filteredDocuments.length})
         </Text>
       </View>
 
       <View style={styles.filterContainer}>
-        {renderFilterButton('all', 'Todas')}
-        {renderFilterButton('today', 'Hoy')}
-        {renderFilterButton('week', 'Semana')}
-        {renderFilterButton('month', 'Mes')}
+        {renderFilterButton('all', `Todos (${getFilterCount('all')})`)}
+        {renderFilterButton('pending', `Pendientes (${getFilterCount('pending')})`)}
+        {renderFilterButton('approved', `Aprobados (${getFilterCount('approved')})`)}
+        {renderFilterButton('rejected', `Rechazados (${getFilterCount('rejected')})`)}
       </View>
 
-      <FlatList
-        data={filteredActivities}
-        renderItem={renderActivity}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#0891B2']}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>No hay actividades</Text>
-            <Text style={styles.emptyText}>
-              No se encontraron actividades completadas para el filtro seleccionado
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#ff6d00" />
+          <Text style={styles.loadingText}>Cargando documentos...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredDocuments}
+          renderItem={renderDocument}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#0066cc']}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No hay documentos</Text>
+              <Text style={styles.emptyText}>
+                {selectedFilter === 'all' 
+                  ? 'No has enviado ningún documento aún'
+                  : `No tienes documentos con estado "${getStatusText(selectedFilter)}"`
+                }
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {renderDetailModal()}
     </SafeAreaView>
@@ -535,9 +461,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#f1f5f9',
+    marginRight: 8,
   },
   activeFilterButton: {
-    backgroundColor: '#0891B2',
+    backgroundColor: '#0066cc',
   },
   filterText: {
     fontSize: 14,
@@ -550,7 +477,7 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
   },
-  activityCard: {
+  documentCard: {
     backgroundColor: 'white',
     marginBottom: 12,
     borderRadius: 12,
@@ -564,50 +491,36 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  activityHeader: {
+  documentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  activityInfo: {
+  documentInfo: {
     flex: 1,
   },
-  activityTitle: {
+  documentTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: 2,
   },
-  activityCategory: {
+  documentDescription: {
     fontSize: 14,
     color: '#64748b',
   },
-  activityMeta: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  priorityBadge: {
+  statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  priorityText: {
+  statusText: {
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
   },
-  scoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  scoreText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  activityDetails: {
+  documentDetails: {
     marginBottom: 12,
     gap: 6,
   },
@@ -620,7 +533,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginLeft: 6,
   },
-  activityFooter: {
+  documentFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -628,7 +541,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-  activityFeatures: {
+  documentFeatures: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
@@ -690,10 +603,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 4,
   },
-  detailSubtitle: {
-    fontSize: 16,
-    color: '#64748b',
-  },
   sectionLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -740,16 +649,17 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
-  scoreContainer: {
+  fieldRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  scoreValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  fieldLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginRight: 8,
   },
-  scoreDescription: {
+  fieldValue: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#374151',
   },
-}); 
+});

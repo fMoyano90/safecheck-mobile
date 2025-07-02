@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { 
   documentsApi, 
@@ -30,6 +31,7 @@ export const useActivityForm = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   // Cargar template al montar el componente
   useEffect(() => {
@@ -122,7 +124,17 @@ export const useActivityForm = ({
       Alert.alert(
         'Éxito', 
         'Formulario enviado correctamente', 
-        [{ text: 'OK' }]
+        [{ 
+          text: 'OK',
+          onPress: () => {
+            // Navegar de vuelta a la vista correspondiente
+            if (activityType === 'scheduled') {
+              router.push('/(tabs)/scheduled');
+            } else {
+              router.push('/(tabs)/recurring-activities');
+            }
+          }
+        }]
       );
 
       console.log('Documento creado:', result);

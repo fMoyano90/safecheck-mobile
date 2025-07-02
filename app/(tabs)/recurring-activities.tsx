@@ -326,7 +326,7 @@ export default function RecurringActivitiesScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0891B2" />
+          <ActivityIndicator size="large" color="#ff6d00" />
           <Text style={styles.loadingText}>
             {isLoading ? 'Verificando autenticación...' : 'Cargando actividades recurrentes...'}
           </Text>

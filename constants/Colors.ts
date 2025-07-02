@@ -1,19 +1,35 @@
-const tintColorLight = '#0066cc'; // SafetyTech Blue
+/**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark theme.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+const tintColorLight = '#0a7ea4';
 const tintColorDark = '#fff';
 
-export default {
+export const Colors = {
   light: {
-    text: '#000',
+    text: '#11181C',
     background: '#fff',
     tint: tintColorLight,
-    tabIconDefault: '#ccc',
+    icon: '#687076',
+    tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
   },
   dark: {
-    text: '#fff',
-    background: '#000',
+    text: '#ECEDEE',
+    background: '#151718',
     tint: tintColorDark,
-    tabIconDefault: '#ccc',
+    icon: '#9BA1A6',
+    tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
+  // SafetyTech Brand Colors
+  safetyTech: {
+    primary: '#ff6d00',      // Naranja principal
+    primaryLight: '#ff834d', // Naranja claro
+    primaryDark: '#cc5200',  // Naranja oscuro
+    secondary: '#0066cc',    // Azul SafetyTech
+    loading: '#ff6d00',      // Color para todos los loading indicators
+    loadingLight: '#ff834d', // Color alternativo para loading
+  }
 };
