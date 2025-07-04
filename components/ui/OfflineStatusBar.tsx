@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useOfflineStatus, syncManager } from '@/lib/offline';
+import { connectivityConfig } from '@/lib/config/connectivity-config';
 
 interface OfflineStatusBarProps {
   style?: any;
@@ -18,36 +19,45 @@ export function OfflineStatusBar({ style }: OfflineStatusBarProps) {
 
   const handleSyncPress = async () => {
     if (!canMakeRequests) {
-      Alert.alert(
-        'Sin conexión',
-        'No hay conexión a internet disponible para sincronizar',
-        [{ text: 'OK' }]
-      );
+      // Solo mostrar alerta si no está en modo silencioso
+      if (!connectivityConfig.isSilentMode()) {
+        Alert.alert(
+          'Sin conexión',
+          'No hay conexión a internet disponible para sincronizar',
+          [{ text: 'OK' }]
+        );
+      }
       return;
     }
 
     try {
       const result = await syncManager.syncNow();
       
-      if (result.success) {
+      // Solo mostrar alertas de sincronización si está permitido
+      if (connectivityConfig.shouldShowSyncAlerts()) {
+        if (result.success) {
+          Alert.alert(
+            'Sincronización completada',
+            `${result.syncedItems} elementos sincronizados correctamente`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Error en sincronización',
+            `Se sincronizaron ${result.syncedItems} elementos, pero ${result.failedItems} fallaron`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (error) {
+      // Solo mostrar error si está permitido
+      if (connectivityConfig.shouldShowSyncAlerts()) {
         Alert.alert(
-          'Sincronización completada',
-          `${result.syncedItems} elementos sincronizados correctamente`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Error en sincronización',
-          `Se sincronizaron ${result.syncedItems} elementos, pero ${result.failedItems} fallaron`,
+          'Error',
+          'No se pudo iniciar la sincronización',
           [{ text: 'OK' }]
         );
       }
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        'No se pudo iniciar la sincronización',
-        [{ text: 'OK' }]
-      );
     }
   };
 
@@ -72,6 +82,32 @@ export function OfflineStatusBar({ style }: OfflineStatusBarProps) {
     }
     return 'Sincronizado';
   };
+
+  // Si está configurado para mostrar solo indicador, usar versión compacta
+  if (connectivityConfig.shouldShowOnlyIndicator()) {
+    return (
+      <View style={[styles.compactContainer, style]}>
+        <Ionicons 
+          name={isOnline ? 'wifi' : 'wifi-outline'} 
+          size={14} 
+          color={getStatusColor()} 
+        />
+        {syncStatus.isRunning && (
+          <Ionicons 
+            name="sync" 
+            size={12} 
+            color="#666"
+            style={styles.syncIcon}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // Si está en modo silencioso, no mostrar nada
+  if (connectivityConfig.isSilentMode()) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, style]}>
@@ -129,6 +165,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
   },
+  compactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 1000,
+  },
   statusSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -152,6 +200,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
   },
+  syncIcon: {
+    marginLeft: 4,
+  },
   progressContainer: {
     position: 'absolute',
     bottom: 0,
@@ -166,4 +217,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OfflineStatusBar; 
+export default OfflineStatusBar;

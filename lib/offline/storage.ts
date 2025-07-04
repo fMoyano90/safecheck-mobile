@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   // Datos de usuario y autenticación
   USER_PROFILE: 'offline_user_profile',
   ACTIVITIES: 'offline_activities',
+  RECURRING_ACTIVITIES: 'offline_recurring_activities',
   TEMPLATES: 'offline_templates',
   DOCUMENTS: 'offline_documents',
   
@@ -114,6 +115,24 @@ class OfflineStorage {
       await this.setItem(STORAGE_KEYS.ACTIVITIES, activities);
       console.log(`💾 Actividad ${activityId} actualizada offline`);
     }
+  }
+
+  // === MANEJO DE ACTIVIDADES RECURRENTES ===
+  async saveRecurringActivities(recurringActivities: any[]): Promise<void> {
+    const offlineRecurringActivities = recurringActivities.map(activity => ({
+      id: activity.id,
+      data: activity,
+      lastModified: new Date().toISOString(),
+      syncStatus: 'synced' as const
+    }));
+
+    await this.setItem(STORAGE_KEYS.RECURRING_ACTIVITIES, offlineRecurringActivities);
+    console.log(`💾 ${recurringActivities.length} actividades recurrentes guardadas offline`);
+  }
+
+  async getRecurringActivities(): Promise<OfflineActivity[]> {
+    const activities = await this.getItem<OfflineActivity[]>(STORAGE_KEYS.RECURRING_ACTIVITIES);
+    return activities || [];
   }
 
   // === MANEJO DE DOCUMENTOS ===
@@ -354,4 +373,4 @@ class OfflineStorage {
 }
 
 // Instancia singleton
-export const offlineStorage = new OfflineStorage(); 
+export const offlineStorage = new OfflineStorage();

@@ -277,12 +277,44 @@ class OfflineApiManager {
   
   // Wrapper específico para actividades
   async getActivities(params?: any): Promise<any[]> {
-    return this.request<any[]>('/api/v1/activities/user/me', {
+    // Primero obtenemos la información del usuario autenticado para saber su ID
+    const profile = await this.request<any>('/api/v1/auth/profile', {
+      method: 'GET',
+    }, {
+      enableCache: true,
+      cacheTimeout: 60, // Cache del perfil por 1 hora
+      priority: 'high',
+    });
+    const userId = profile.id;
+    
+    // Usar el endpoint específico del usuario
+    return this.request<any[]>(`/api/v1/activities/user/${userId}`, {
       method: 'GET',
     }, {
       enableCache: true,
       cacheTimeout: 15, // 15 minutos para actividades
       priority: 'high',
+    });
+  }
+
+  async getRecurringActivities(): Promise<any[]> {
+    // Primero obtenemos la información del usuario autenticado para saber su ID
+    const profile = await this.request<any>('/api/v1/auth/profile', {
+      method: 'GET',
+    }, {
+      enableCache: true,
+      cacheTimeout: 60, // Cache del perfil por 1 hora
+      priority: 'high',
+    });
+    const userId = profile.id;
+    
+    // Usar el endpoint específico para actividades recurrentes del usuario
+    return this.request<any[]>(`/api/v1/recurring-activities/user/${userId}`, {
+      method: 'GET',
+    }, {
+      enableCache: true,
+      cacheTimeout: 30, // 30 minutos para actividades recurrentes
+      priority: 'medium',
     });
   }
 
@@ -343,7 +375,62 @@ export const offlineApi = new OfflineApiManager();
 
 // Exportar métodos específicos para fácil uso
 export const offlineActivitiesApi = {
-  getMyActivities: () => offlineApi.getActivities(),
+  getMyActivities: async (params?: {
+    status?: 'pending' | 'completed' | 'approved' | 'rejected' | 'overdue';
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const allActivities = await offlineApi.getActivities();
+    
+    // Aplicar filtros si se proporcionan
+    let filteredActivities = allActivities;
+    
+    if (params) {
+      if (params.status) {
+        filteredActivities = filteredActivities.filter(a => a.status === params.status);
+      }
+      if (params.priority) {
+        filteredActivities = filteredActivities.filter(a => a.priority === params.priority);
+      }
+      if (params.startDate) {
+        const startDate = new Date(params.startDate);
+        filteredActivities = filteredActivities.filter(a => new Date(a.assignedDate) >= startDate);
+      }
+      if (params.endDate) {
+        const endDate = new Date(params.endDate);
+        filteredActivities = filteredActivities.filter(a => new Date(a.assignedDate) <= endDate);
+      }
+    }
+    
+    return filteredActivities;
+  },
+  
+  getTodayCompleted: async () => {
+    const allActivities = await offlineApi.getActivities();
+    const today = new Date().toDateString();
+    
+    return allActivities.filter(activity => {
+      const activityDate = new Date(activity.assignedDate).toDateString();
+      return activity.status === 'completed' && activityDate === today;
+    });
+  },
+  
+  getRecurringActivities: async (params?: {
+    status?: 'active' | 'inactive' | 'paused';
+  }) => {
+    const allRecurringActivities = await offlineApi.getRecurringActivities();
+    
+    // Aplicar filtros si se proporcionan
+    let filteredActivities = allRecurringActivities;
+    
+    if (params?.status) {
+      filteredActivities = filteredActivities.filter(a => a.status === params.status);
+    }
+    
+    return filteredActivities;
+  },
+  
   complete: (id: number, data: any) => offlineApi.completeActivity(id, data),
 };
 
@@ -351,4 +438,4 @@ export const offlineDocumentsApi = {
   getTemplate: (activityId: number, activityType: string) => 
     offlineApi.getTemplate(activityId, activityType),
   createFromActivity: (data: any) => offlineApi.createDocument(data),
-}; 
+};

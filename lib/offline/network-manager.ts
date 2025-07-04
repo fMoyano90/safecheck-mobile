@@ -1,5 +1,6 @@
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { EventEmitter } from 'events';
+import { connectivityConfig } from '../config/connectivity-config';
 
 export interface NetworkState {
   isConnected: boolean;
@@ -41,10 +42,16 @@ class NetworkManager extends EventEmitter {
       this.emit('connectionChange', this.currentState);
       
       if (this.currentState.isConnected) {
-        console.log('🟢 Conexión restaurada');
+        // Solo mostrar mensaje si está permitido
+        if (connectivityConfig.shouldShowConnectionNotification()) {
+          console.log('🟢 Conexión restaurada');
+        }
         this.emit('connected', this.currentState);
       } else {
-        console.log('🔴 Conexión perdida');
+        // Solo mostrar mensaje si está permitido
+        if (connectivityConfig.shouldShowConnectionNotification()) {
+          console.log('🔴 Conexión perdida');
+        }
         this.emit('disconnected', this.currentState);
       }
     }
@@ -70,22 +77,22 @@ class NetworkManager extends EventEmitter {
       return false;
     }
 
-    // Para WiFi, considerar fuerte si hay buena señal
+    // Para WiFi, considerar fuerte a menos que la señal sea muy débil
     if (state.type === 'wifi' && state.details) {
       const wifiDetails = state.details as any;
-      // Considerar fuerte si la fuerza de señal es > -70 dBm
-      return wifiDetails.strength ? wifiDetails.strength > -70 : true;
+      // Solo considerar débil si la fuerza de señal es muy baja (< -85 dBm)
+      return wifiDetails.strength ? wifiDetails.strength > -85 : true;
     }
 
-    // Para datos móviles, considerar la generación
+    // Para datos móviles, ser más permisivo
     if (state.type === 'cellular' && state.details) {
       const cellularDetails = state.details as any;
-      // 4G/5G se considera fuerte, 3G medio, 2G débil
-      return cellularDetails.cellularGeneration === '4g' || 
-             cellularDetails.cellularGeneration === '5g';
+      // Considerar fuerte 4G/5G, aceptable 3G, solo rechazar 2G o inferior
+      const generation = cellularDetails.cellularGeneration;
+      return generation !== '2g' && generation !== 'edge' && generation !== 'gprs';
     }
 
-    // Por defecto, si hay conexión, considerarla aceptable
+    // Por defecto, si hay conexión estable, considerarla fuerte
     return true;
   }
 
@@ -132,4 +139,4 @@ class NetworkManager extends EventEmitter {
 }
 
 // Instancia singleton
-export const networkManager = new NetworkManager(); 
+export const networkManager = new NetworkManager();

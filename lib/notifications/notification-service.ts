@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 import { tokenManager } from "../api/config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { connectivityConfig } from "../config/connectivity-config";
 
 // Configurar el comportamiento de las notificaciones
 Notifications.setNotificationHandler({
@@ -121,20 +122,29 @@ class NotificationService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      console.log("✅ Conectado al WebSocket");
+      // Solo mostrar mensaje de conexión si está permitido
+      if (connectivityConfig.shouldShowReconnectionMessages()) {
+        console.log("✅ Conectado al WebSocket");
+      }
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.reconnectDelay = 1000;
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("❌ Desconectado del WebSocket:", reason);
+      // Solo mostrar mensaje de desconexión si está permitido
+      if (connectivityConfig.shouldShowReconnectionMessages()) {
+        console.log("❌ Desconectado del WebSocket:", reason);
+      }
       this.isConnected = false;
       this.handleReconnection();
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("❌ Error de conexión WebSocket:", error);
+      // Solo mostrar error de conexión si está permitido
+      if (connectivityConfig.shouldShowReconnectionMessages()) {
+        console.error("❌ Error de conexión WebSocket:", error);
+      }
       this.isConnected = false;
       this.handleReconnection();
     });
@@ -166,16 +176,22 @@ class NotificationService {
   // Manejar reconexión automática
   private handleReconnection() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("❌ Máximo de intentos de reconexión alcanzado");
+      // Solo mostrar mensaje si no está en modo silencioso
+      if (connectivityConfig.shouldShowReconnectionMessages()) {
+        console.error("❌ Máximo de intentos de reconexión alcanzado");
+      }
       return;
     }
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Backoff exponencial
 
-    console.log(
-      `🔄 Reintentando conexión en ${delay}ms (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-    );
+    // Solo mostrar mensajes de reconexión si está permitido
+    if (connectivityConfig.shouldShowReconnectionMessages()) {
+      console.log(
+        `🔄 Reintentando conexión en ${delay}ms (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+      );
+    }
 
     setTimeout(() => {
       this.connect();
