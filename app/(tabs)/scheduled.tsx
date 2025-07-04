@@ -68,6 +68,7 @@ export default function ScheduledActivitiesScreen() {
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [rawActivities, setRawActivities] = useState<Activity[]>([]);
+  const [overdueCollapsed, setOverdueCollapsed] = useState(false);
 
   // Función helper para crear fecha local desde string YYYY-MM-DD
   const createLocalDate = (dateString: string) => {
@@ -382,7 +383,25 @@ export default function ScheduledActivitiesScreen() {
       return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
     })();
     const todayActivities = getActivitiesForDate(today);
+    const overdueActivities = activities.filter(activity => activity.date < today && activity.status === 'pending');
     const upcomingActivities = activities.filter(activity => activity.date > today).slice(0, 10);
+    const totalOverdueCount = overdueActivities.length;
+
+    // Función para obtener el texto de tiempo relativo para actividades vencidas
+    const getOverdueTimeText = (activityDate: string) => {
+      const today = new Date();
+      const activityDateObj = createLocalDate(activityDate);
+      const diffTime = today.getTime() - activityDateObj.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        return 'Ayer';
+      } else if (diffDays > 1) {
+        return `Hace ${diffDays} días`;
+      } else {
+        return 'Hoy';
+      }
+    };
 
     return (
       <ScrollView 
@@ -396,6 +415,45 @@ export default function ScheduledActivitiesScreen() {
         }
 
       >
+        {/* Actividades vencidas */}
+        {overdueActivities.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.overdueAlert}>
+              <Ionicons name="warning" size={16} color="#ffffff" />
+              <Text style={styles.overdueAlertText}>
+                Tienes {totalOverdueCount} actividad{totalOverdueCount !== 1 ? 'es' : ''} vencida{totalOverdueCount !== 1 ? 's' : ''} pendiente{totalOverdueCount !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.collapsibleSectionHeader}
+              onPress={() => setOverdueCollapsed(!overdueCollapsed)}
+            >
+              <View style={styles.sectionHeader}>
+                <Ionicons name="alert-circle" size={20} color="#dc2626" />
+                <Text style={styles.sectionTitle}>Actividades Vencidas ({totalOverdueCount})</Text>
+              </View>
+              <Ionicons 
+                name={overdueCollapsed ? "chevron-down" : "chevron-up"} 
+                size={20} 
+                color="#dc2626" 
+              />
+            </TouchableOpacity>
+            {!overdueCollapsed && (
+              <View>
+                {overdueActivities.map(activity => (
+                  <View key={activity.id} style={styles.overdueActivity}>
+                    <View style={styles.overdueTimeContainer}>
+                      <Text style={styles.overdueLabel}>{getOverdueTimeText(activity.date)}</Text>
+                      <Text style={styles.overdueTime}>{activity.time}</Text>
+                    </View>
+                    {renderActivityCard(activity)}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Actividades de hoy */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -788,5 +846,49 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  // Estilos para actividades vencidas
+  overdueActivity: {
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    paddingLeft: 8,
+  },
+  overdueAlert: {
+    backgroundColor: '#dc2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  overdueAlertText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  overdueTimeContainer: {
+    marginBottom: 4,
+  },
+  overdueLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#dc2626',
+    textTransform: 'uppercase',
+  },
+  overdueTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#dc2626',
+  },
+  collapsibleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
 });

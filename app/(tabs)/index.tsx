@@ -855,138 +855,249 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Próximas actividades */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <FontAwesome name="clock-o" size={20} color="#1565c0" />
-              <Text style={styles.sectionTitle}>Próximas Actividades</Text>
-            </View>
-
-            {loadingActivities ? (
+          {/* Actividades */}
+          {loadingActivities ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <FontAwesome name="clock-o" size={20} color="#1565c0" />
+                <Text style={styles.sectionTitle}>Cargando Actividades</Text>
+              </View>
               <View style={styles.activityLoadingContainer}>
                 <ActivityIndicator size="small" color="#ff6d00" />
                 <Text style={styles.activityLoadingText}>
                   Cargando actividades...
                 </Text>
               </View>
-            ) : todayActivities.length > 0 ? (
-              <>
-                {/* Mostrar las próximas 4 actividades pendientes */}
-                {todayActivities.slice(0, 4).map((activity) => {
-                  // Encontrar la actividad completa correspondiente
-                  const fullActivity = upcomingActivities.find(
-                    (a) => a.id === activity.id
-                  );
+            </View>
+          ) : (
+            <>
+              {/* Actividades Vencidas */}
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const overdueActivities = todayActivities.filter((activity) => {
+                  const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
+                  if (!fullActivity) return false;
+                  
+                  const activityDate = new Date(fullActivity.assignedDate);
+                  activityDate.setHours(0, 0, 0, 0);
+                  
+                  return activityDate < today;
+                });
 
-                  // Determinar si es hoy, mañana o futuro
-                  const activityDate = fullActivity
-                    ? new Date(fullActivity.assignedDate)
-                    : new Date();
-                  const today = new Date();
-                  const tomorrow = new Date(today);
-                  tomorrow.setDate(today.getDate() + 1);
+                return overdueActivities.length > 0 ? (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <FontAwesome name="exclamation-triangle" size={20} color="#dc2626" />
+                      <Text style={[styles.sectionTitle, { color: '#dc2626' }]}>Actividades Vencidas</Text>
+                    </View>
+                    
+                    <View style={styles.overdueAlert}>
+                      <FontAwesome name="warning" size={16} color="#dc2626" />
+                      <Text style={styles.overdueAlertText}>
+                        Tienes {overdueActivities.length} actividad{overdueActivities.length > 1 ? 'es' : ''} vencida{overdueActivities.length > 1 ? 's' : ''}. Es importante completarlas lo antes posible.
+                      </Text>
+                    </View>
 
-                  let dateLabel = "";
-                  let additionalStyle = {};
+                    {overdueActivities.slice(0, 3).map((activity) => {
+                      const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
+                      const activityDate = fullActivity ? new Date(fullActivity.assignedDate) : new Date();
+                      
+                      const daysDiff = Math.floor((today.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24));
+                      const dateLabel = daysDiff === 1 ? "Ayer" : `Hace ${daysDiff} días`;
 
-                  if (activityDate.toDateString() === today.toDateString()) {
-                    dateLabel = "Hoy";
-                    additionalStyle = styles.todayActivity;
-                  } else if (
-                    activityDate.toDateString() === tomorrow.toDateString()
-                  ) {
-                    dateLabel = "Mañana";
-                    additionalStyle = styles.tomorrowActivity;
-                  } else {
-                    dateLabel = activityDate.toLocaleDateString("es-ES", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    });
-                    additionalStyle = styles.futureActivity;
-                  }
-
-                  return (
-                    <TouchableOpacity
-                      key={activity.id}
-                      style={[styles.homeActivityCard, additionalStyle]}
-                      onPress={() => handleActivityPress(activity)}
-                    >
-                      <View style={styles.homeActivityHeader}>
-                        <View style={styles.activityTimeWithDate}>
-                          <Text style={styles.dateLabel}>{dateLabel}</Text>
-                          <Text style={styles.timeText}>{activity.time}</Text>
-                        </View>
-                        <View style={styles.activityContent}>
-                          <Text style={styles.activityTitle}>
-                            {activity.title}
-                          </Text>
-                          <View style={styles.activityDetails}>
-                            <FontAwesome
-                              name={getActivityIcon(activity.type)}
-                              size={12}
-                              color={getActivityColor(activity.type)}
-                            />
-                            <Text style={styles.locationText}>
-                              {activity.location}
-                            </Text>
+                      return (
+                        <TouchableOpacity
+                          key={activity.id}
+                          style={[styles.homeActivityCard, styles.overdueActivity]}
+                          onPress={() => handleActivityPress(activity)}
+                        >
+                          <View style={styles.homeActivityHeader}>
+                            <View style={[styles.activityTimeWithDate, styles.overdueTimeContainer]}>
+                              <Text style={[styles.dateLabel, styles.overdueLabel]}>{dateLabel}</Text>
+                              <Text style={[styles.timeText, styles.overdueTime]}>{activity.time}</Text>
+                            </View>
+                            <View style={styles.activityContent}>
+                              <Text style={styles.activityTitle}>
+                                {activity.title}
+                              </Text>
+                              <View style={styles.activityDetails}>
+                                <FontAwesome
+                                  name={getActivityIcon(activity.type)}
+                                  size={12}
+                                  color={getActivityColor(activity.type)}
+                                />
+                                <Text style={styles.locationText}>
+                                  {activity.location}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.activityIcons}>
+                              <FontAwesome
+                                name="exclamation-circle"
+                                size={16}
+                                color="#dc2626"
+                              />
+                              <FontAwesome
+                                name="chevron-right"
+                                size={14}
+                                color="#ccc"
+                              />
+                            </View>
                           </View>
-                        </View>
-                        <View style={styles.activityIcons}>
-                          <View
-                            style={[
-                              styles.priorityIndicator,
-                              {
-                                backgroundColor: getPriorityColor(
-                                  activity.priority
-                                ),
-                              },
-                            ]}
-                          />
-                          <FontAwesome
-                            name="chevron-right"
-                            size={14}
-                            color="#ccc"
-                          />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                        </TouchableOpacity>
+                      );
+                    })}
 
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  onPress={() => router.push("/scheduled")}
-                >
-                  <Text style={styles.viewAllText}>
-                    Ver todas las programadas{" "}
-                    {todayActivities.length > 4
-                      ? `(${todayActivities.length} total)`
-                      : ""}
-                  </Text>
-                  <FontAwesome name="arrow-right" size={12} color="#0066cc" />
-                </TouchableOpacity>
-              </>
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <FontAwesome name="calendar-o" size={48} color="#94A3B8" />
-                <Text style={styles.emptyStateTitle}>
-                  No hay actividades programadas
-                </Text>
-                <Text style={styles.emptyStateText}>
-                  No tienes actividades pendientes por realizar
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyStateButton}
-                  onPress={() => router.push("/recurring-activities")}
-                >
-                  <Text style={styles.emptyStateButtonText}>
-                    Ver Actividades Recurrentes
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+                    {overdueActivities.length > 3 && (
+                      <TouchableOpacity
+                        style={styles.viewAllButtonRed}
+                        onPress={() => router.push("/scheduled")}
+                      >
+                        <Text style={styles.viewAllTextRed}>
+                          Ver todas las vencidas ({overdueActivities.length} total)
+                        </Text>
+                        <FontAwesome name="arrow-right" size={12} color="#dc2626" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : null;
+              })()}
+
+              {/* Próximas Actividades */}
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const upcomingActivitiesFiltered = todayActivities.filter((activity) => {
+                  const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
+                  if (!fullActivity) return false;
+                  
+                  const activityDate = new Date(fullActivity.assignedDate);
+                  activityDate.setHours(0, 0, 0, 0);
+                  
+                  return activityDate >= today;
+                });
+
+                return upcomingActivitiesFiltered.length > 0 ? (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <FontAwesome name="clock-o" size={20} color="#1565c0" />
+                      <Text style={styles.sectionTitle}>Próximas Actividades</Text>
+                    </View>
+
+                    {upcomingActivitiesFiltered.slice(0, 4).map((activity) => {
+                      const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
+                      const activityDate = fullActivity ? new Date(fullActivity.assignedDate) : new Date();
+                      const tomorrow = new Date(today);
+                      tomorrow.setDate(today.getDate() + 1);
+
+                      let dateLabel = "";
+                      let additionalStyle = {};
+
+                      if (activityDate.toDateString() === today.toDateString()) {
+                        dateLabel = "Hoy";
+                        additionalStyle = styles.todayActivity;
+                      } else if (activityDate.toDateString() === tomorrow.toDateString()) {
+                        dateLabel = "Mañana";
+                        additionalStyle = styles.tomorrowActivity;
+                      } else {
+                        dateLabel = activityDate.toLocaleDateString("es-ES", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        });
+                        additionalStyle = styles.futureActivity;
+                      }
+
+                      return (
+                        <TouchableOpacity
+                          key={activity.id}
+                          style={[styles.homeActivityCard, additionalStyle]}
+                          onPress={() => handleActivityPress(activity)}
+                        >
+                          <View style={styles.homeActivityHeader}>
+                            <View style={styles.activityTimeWithDate}>
+                              <Text style={styles.dateLabel}>{dateLabel}</Text>
+                              <Text style={styles.timeText}>{activity.time}</Text>
+                            </View>
+                            <View style={styles.activityContent}>
+                              <Text style={styles.activityTitle}>
+                                {activity.title}
+                              </Text>
+                              <View style={styles.activityDetails}>
+                                <FontAwesome
+                                  name={getActivityIcon(activity.type)}
+                                  size={12}
+                                  color={getActivityColor(activity.type)}
+                                />
+                                <Text style={styles.locationText}>
+                                  {activity.location}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.activityIcons}>
+                              <View
+                                style={[
+                                  styles.priorityIndicator,
+                                  {
+                                    backgroundColor: getPriorityColor(activity.priority),
+                                  },
+                                ]}
+                              />
+                              <FontAwesome
+                                name="chevron-right"
+                                size={14}
+                                color="#ccc"
+                              />
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    <TouchableOpacity
+                      style={styles.viewAllButton}
+                      onPress={() => router.push("/scheduled")}
+                    >
+                      <Text style={styles.viewAllText}>
+                        Ver todas las programadas{" "}
+                        {upcomingActivitiesFiltered.length > 4
+                          ? `(${upcomingActivitiesFiltered.length} total)`
+                          : ""}
+                      </Text>
+                      <FontAwesome name="arrow-right" size={12} color="#0066cc" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <FontAwesome name="clock-o" size={20} color="#1565c0" />
+                      <Text style={styles.sectionTitle}>Próximas Actividades</Text>
+                    </View>
+                    <View style={styles.emptyStateContainer}>
+                      <FontAwesome name="calendar-o" size={48} color="#94A3B8" />
+                      <Text style={styles.emptyStateTitle}>
+                        No hay actividades programadas
+                      </Text>
+                      <Text style={styles.emptyStateText}>
+                        No tienes actividades pendientes por realizar
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.emptyStateButton}
+                        onPress={() => router.push("/recurring-activities")}
+                      >
+                        <Text style={styles.emptyStateButtonText}>
+                          Ver Actividades Recurrentes
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })()}
+            </>
+          )}
 
           {/* Actividades completadas hoy */}
           <View style={styles.section}>
@@ -1402,5 +1513,61 @@ const styles = StyleSheet.create({
     color: "#92400e",
     textAlign: "center",
     fontWeight: "500",
+  },
+  // Estilos para actividades vencidas
+  overdueActivity: {
+    backgroundColor: "#fef2f2", // red-50
+    borderLeftWidth: 3,
+    borderLeftColor: "#dc2626", // red-600
+    borderWidth: 1,
+    borderColor: "#fecaca", // red-200
+  },
+  overdueAlert: {
+    backgroundColor: "#fee2e2", // red-100
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc2626", // red-600
+  },
+  overdueAlertText: {
+    fontSize: 14,
+    color: "#991b1b", // red-800
+    fontWeight: "500",
+    flex: 1,
+    lineHeight: 20,
+  },
+  overdueTimeContainer: {
+    backgroundColor: "#fee2e2", // red-100
+    borderColor: "#fecaca", // red-200
+    borderWidth: 1,
+  },
+  overdueLabel: {
+    color: "#991b1b", // red-800
+    fontWeight: "700",
+  },
+  overdueTime: {
+    color: "#dc2626", // red-600
+    fontWeight: "600",
+  },
+  viewAllButtonRed: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fee2e2", // red-100
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#fecaca", // red-200
+  },
+  viewAllTextRed: {
+    fontSize: 14,
+    color: "#dc2626", // red-600
+    fontWeight: "600",
+    marginRight: 6,
   },
 });
