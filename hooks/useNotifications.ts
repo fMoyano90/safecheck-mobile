@@ -44,7 +44,19 @@ export const useNotifications = (): UseNotificationsReturn => {
     try {
       const localNotifications =
         await notificationService.getLocalNotifications();
-      setNotifications(localNotifications);
+      
+      // Asegurar que no hay duplicados en el estado
+      const uniqueNotifications = localNotifications.filter((notification, index, self) => 
+        index === self.findIndex(n => n.id === notification.id)
+      );
+      
+      // Log temporal para debugging
+      if (localNotifications.length !== uniqueNotifications.length) {
+        console.log(`🔍 Duplicados encontrados: ${localNotifications.length - uniqueNotifications.length}`);
+        console.log('IDs duplicados:', localNotifications.map(n => n.id).filter((id, index, self) => self.indexOf(id) !== index));
+      }
+      
+      setNotifications(uniqueNotifications);
     } catch (error) {
       console.error("❌ Error cargando notificaciones locales:", error);
     }
@@ -68,7 +80,18 @@ export const useNotifications = (): UseNotificationsReturn => {
   // Manejar nueva notificación
   const handleNewNotification = useCallback(
     (notification: NotificationData) => {
-      setNotifications((prev) => [notification, ...prev]);
+      setNotifications((prev) => {
+        // Verificar si la notificación ya existe para evitar duplicados
+        const existingIndex = prev.findIndex(n => n.id === notification.id);
+        if (existingIndex !== -1) {
+          // Si ya existe, actualizar la notificación existente
+          const updated = [...prev];
+          updated[existingIndex] = notification;
+          return updated;
+        }
+        // Si no existe, agregar al inicio
+        return [notification, ...prev];
+      });
     },
     []
   );

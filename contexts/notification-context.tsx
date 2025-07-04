@@ -39,13 +39,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [isInitialized, setIsInitialized] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const loadNotifications = async () => {
-    // Implementar carga de notificaciones
-  };
 
   // Inicializar el servicio de notificaciones cuando el usuario esté autenticado
   useEffect(() => {
@@ -65,17 +58,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
             notificationCleanup = deviceTokenService.setupNotificationListeners();
           }
           
-          // Conectar al servicio de notificaciones WebSocket
-          await notificationService.connect();
-          setIsConnected(true);
+          // La conexión WebSocket se maneja en useNotifications hook
           setConnectionError(null);
-          
-          // Cargar notificaciones iniciales
-          await loadNotifications();
         } catch (error) {
           console.error('Error conectando notificaciones:', error);
           setConnectionError('Error de conexión');
-          setIsConnected(false);
         } finally {
           setIsConnecting(false);
         }
@@ -83,9 +70,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         // Desconectar si no hay usuario
         notificationService.disconnect();
         deviceTokenService.unregisterToken();
-        setIsConnected(false);
-        setNotifications([]);
-        setUnreadCount(0);
       }
     };
 
@@ -106,8 +90,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         notificationService.disconnect();
         setIsInitialized(false);
       } else if (isAuthenticated && !isInitialized) {
-        // Usuario se logueó, conectar notificaciones
-        await notificationService.connect();
+        // Usuario se logueó, la conexión se maneja en useNotifications hook
         setIsInitialized(true);
       }
     };
@@ -125,8 +108,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         // App se activó, reconectar si es necesario
         const isAuthenticated = await tokenManager.isAuthenticated();
         if (isAuthenticated && !notificationService.getConnectionStatus().isConnected) {
-          console.log('🔄 Reconectando notificaciones al activar app...');
-          await notificationService.connect();
+          console.log('🔄 Reconexión se maneja en useNotifications hook');
         }
       }
     };

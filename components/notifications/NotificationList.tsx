@@ -193,7 +193,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}_${index}`}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}

@@ -76,6 +76,18 @@ class NotificationService {
   // Conectar al WebSocket del backend
   async connect() {
     try {
+      // Verificar si ya hay una conexión activa
+      if (this.socket && this.isConnected) {
+        console.log("ℹ️ Ya hay una conexión WebSocket activa");
+        return;
+      }
+
+      // Desconectar socket anterior si existe pero no está conectado
+      if (this.socket && !this.isConnected) {
+        this.socket.disconnect();
+        this.socket = null;
+      }
+
       const token = await tokenManager.getAccessToken();
       if (!token) {
         console.warn(
@@ -232,10 +244,22 @@ class NotificationService {
   private async saveNotificationLocally(notification: NotificationData) {
     try {
       const existingNotifications = await this.getLocalNotifications();
-      const updatedNotifications = [
-        notification,
-        ...existingNotifications,
-      ].slice(0, 100); // Mantener solo las últimas 100
+      
+      // Verificar si la notificación ya existe para evitar duplicados
+      const existingIndex = existingNotifications.findIndex(n => n.id === notification.id);
+      
+      let updatedNotifications;
+      if (existingIndex !== -1) {
+        // Si ya existe, actualizar la notificación existente
+        updatedNotifications = [...existingNotifications];
+        updatedNotifications[existingIndex] = notification;
+      } else {
+        // Si no existe, agregar al inicio
+        updatedNotifications = [
+          notification,
+          ...existingNotifications,
+        ].slice(0, 100); // Mantener solo las últimas 100
+      }
 
       await AsyncStorage.setItem(
         "local_notifications",
@@ -246,11 +270,36 @@ class NotificationService {
     }
   }
 
+  // Limpiar notificaciones duplicadas del almacenamiento
+  private async cleanDuplicateNotifications(): Promise<NotificationData[]> {
+    try {
+      const notifications = await AsyncStorage.getItem("local_notifications");
+      if (!notifications) return [];
+      
+      const parsedNotifications: NotificationData[] = JSON.parse(notifications);
+      
+      // Eliminar duplicados basándose en el ID
+      const uniqueNotifications = parsedNotifications.filter((notification, index, self) => 
+        index === self.findIndex(n => n.id === notification.id)
+      );
+      
+      // Si había duplicados, guardar la versión limpia
+      if (uniqueNotifications.length !== parsedNotifications.length) {
+        await AsyncStorage.setItem("local_notifications", JSON.stringify(uniqueNotifications));
+        console.log(`🧹 Eliminadas ${parsedNotifications.length - uniqueNotifications.length} notificaciones duplicadas`);
+      }
+      
+      return uniqueNotifications;
+    } catch (error) {
+      console.error("❌ Error limpiando notificaciones duplicadas:", error);
+      return [];
+    }
+  }
+
   // Obtener notificaciones locales
   async getLocalNotifications(): Promise<NotificationData[]> {
     try {
-      const notifications = await AsyncStorage.getItem("local_notifications");
-      return notifications ? JSON.parse(notifications) : [];
+      return await this.cleanDuplicateNotifications();
     } catch (error) {
       console.error("❌ Error obteniendo notificaciones locales:", error);
       return [];
