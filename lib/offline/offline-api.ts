@@ -360,7 +360,7 @@ class OfflineApiManager {
     
     await offlineStorage.saveDocument(offlineDoc);
 
-    return this.request<any>('/api/v1/documents', {
+    return this.request<any>('/api/v1/documents/worker', {
       method: 'POST',
       body: JSON.stringify(documentData),
     }, {

@@ -117,6 +117,59 @@ export const useActivityForm = ({
     }
   };
 
+  // Función para convertir URI local a base64
+  const convertUriToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error convirtiendo URI a base64:', error);
+      throw error;
+    }
+  };
+
+  // Función para procesar imágenes y convertir URIs a base64
+  const processImages = async (images: any): Promise<any> => {
+    if (!images) return images;
+
+    if (Array.isArray(images)) {
+      const processedImages = [];
+      for (const image of images) {
+        if (typeof image === 'string' && (image.startsWith('file://') || image.startsWith('content://'))) {
+          try {
+            const base64Image = await convertUriToBase64(image);
+            processedImages.push(base64Image);
+          } catch (error) {
+            console.warn('No se pudo convertir imagen a base64, manteniendo URI:', image);
+            processedImages.push(image);
+          }
+        } else {
+          processedImages.push(image);
+        }
+      }
+      return processedImages;
+    } else if (typeof images === 'string' && (images.startsWith('file://') || images.startsWith('content://'))) {
+      try {
+        return await convertUriToBase64(images);
+      } catch (error) {
+        console.warn('No se pudo convertir imagen a base64, manteniendo URI:', images);
+        return images;
+      }
+    }
+
+    return images;
+  };
+
   const processFormData = async (formData: any): Promise<DocumentFormData> => {
     const startedAt = new Date().toISOString();
     
@@ -143,18 +196,47 @@ export const useActivityForm = ({
     // Separar datos especiales del resto del formulario
     const { _signatures, _photos, _locations, ...cleanFormData } = formData;
 
+    // Procesar imágenes y firmas para convertir URIs a base64
+    const processedPhotos: Record<string, any> = {};
+    const processedSignatures: Record<string, any> = {};
+    const processedFormData: Record<string, any> = { ...cleanFormData };
+
+    // Procesar fotos
+    if (_photos && Object.keys(_photos).length > 0) {
+      for (const [fieldName, photos] of Object.entries(_photos)) {
+        processedPhotos[fieldName] = await processImages(photos);
+      }
+    }
+
+    // Procesar firmas
+    if (_signatures && Object.keys(_signatures).length > 0) {
+      for (const [fieldName, signature] of Object.entries(_signatures)) {
+        processedSignatures[fieldName] = await processImages(signature);
+      }
+    }
+
+    // Procesar campos del formulario que puedan contener imágenes
+     if (template?.structure) {
+       for (const field of template.structure) {
+         const fieldValue = processedFormData[field.id];
+         if (fieldValue && (field.type === 'photo' || field.type === 'signature')) {
+           processedFormData[field.id] = await processImages(fieldValue);
+         }
+       }
+     }
+
     // Preparar datos para envío
     const documentData: DocumentFormData = {
       activityId,
       activityType,
-      formData: cleanFormData,
+      formData: processedFormData,
       startedAt,
       metadata: {
-        signatures: _signatures || {},
-        photos: _photos || {},
-        hasSignatures: _signatures && Object.keys(_signatures).length > 0,
-        hasPhotos: _photos && Object.keys(_photos).length > 0,
-        completedFields: Object.keys(cleanFormData).length,
+        signatures: processedSignatures,
+        photos: processedPhotos,
+        hasSignatures: Object.keys(processedSignatures).length > 0,
+        hasPhotos: Object.keys(processedPhotos).length > 0,
+        completedFields: Object.keys(processedFormData).length,
         totalFields: template?.structure.length || 0,
         templateId: template?.id,
         templateName: template?.name,
@@ -267,4 +349,4 @@ export const useActivityForm = ({
     submitForm,
     saveForm,
   };
-}; 
+};

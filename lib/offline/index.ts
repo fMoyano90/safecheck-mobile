@@ -158,11 +158,11 @@ export function useOfflineStatus() {
   }, []);
 
   return {
-    isOnline: networkState.isConnected && networkState.isInternetReachable,
-    hasStrongConnection: networkState.hasStrongConnection,
+    isOnline: networkManager.isOnline(),
+    hasStrongConnection: networkManager.hasStrongConnection(),
     networkType: networkState.type,
     syncStatus,
     canMakeRequests: networkManager.canMakeRequests(),
     isSafeForUpload: networkManager.isSafeForUpload(),
   };
-} 
+}

@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { documentsApi, type DocumentResponse } from '@/lib/api';
+import { FieldRenderer } from '@/components/forms/FieldRenderer';
 
 type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -315,12 +316,7 @@ export default function HistoryScreen() {
               <View style={styles.detailSection}>
                 <Text style={styles.sectionLabel}>Datos del Formulario</Text>
                 {Object.entries(selectedDocument.fields).map(([key, value]) => (
-                  <View key={key} style={styles.fieldRow}>
-                    <Text style={styles.fieldLabel}>{key}:</Text>
-                    <Text style={styles.fieldValue}>
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                    </Text>
-                  </View>
+                  <FieldRenderer key={key} fieldKey={key} value={value} />
                 ))}
               </View>
             )}

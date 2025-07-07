@@ -62,18 +62,31 @@ class NetworkManager extends EventEmitter {
   };
 
   private updateNetworkState(state: NetInfoState): void {
+    console.log('🔍 NetInfo state:', {
+      isConnected: state.isConnected,
+      isInternetReachable: state.isInternetReachable,
+      type: state.type,
+      details: state.details
+    });
+    
     const hasStrongConnection = this.evaluateConnectionQuality(state);
     
     this.currentState = {
       isConnected: !!state.isConnected,
-      isInternetReachable: !!state.isInternetReachable,
+      // Ser más tolerante con isInternetReachable - si es null, asumir true si isConnected es true
+      isInternetReachable: state.isInternetReachable !== false,
       type: state.type || 'none',
       hasStrongConnection,
     };
+    
+    console.log('🔍 Updated NetworkState:', this.currentState);
   }
 
   private evaluateConnectionQuality(state: NetInfoState): boolean {
-    if (!state.isConnected || !state.isInternetReachable) {
+    // Usar la misma lógica tolerante que en updateNetworkState
+    const isInternetReachable = state.isInternetReachable !== false;
+    
+    if (!state.isConnected || !isInternetReachable) {
       return false;
     }
 
@@ -120,7 +133,13 @@ class NetworkManager extends EventEmitter {
   }
 
   isOnline(): boolean {
-    return this.currentState.isConnected && this.currentState.isInternetReachable;
+    // Si isInternetReachable es explícitamente false, respetarlo
+    if (this.currentState.isInternetReachable === false) {
+      return false;
+    }
+    
+    // Si tenemos conexión pero isInternetReachable es null/undefined, asumir que hay internet
+    return this.currentState.isConnected;
   }
 
   hasStrongConnection(): boolean {
@@ -135,6 +154,21 @@ class NetworkManager extends EventEmitter {
   // Método para verificar si podemos hacer operaciones básicas
   canMakeRequests(): boolean {
     return this.isOnline();
+  }
+
+  // Método alternativo que hace test real de conectividad
+  async isOnlineWithTest(): Promise<boolean> {
+    if (!this.currentState.isConnected) {
+      return false;
+    }
+    
+    // Si isInternetReachable es explícitamente true, confiar en él
+    if (this.currentState.isInternetReachable === true) {
+      return true;
+    }
+    
+    // Si es null o false, hacer test real
+    return await this.testConnectivity();
   }
 }
 
