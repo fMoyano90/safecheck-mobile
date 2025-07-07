@@ -47,7 +47,15 @@ export const useAutoRefresh = ({
 
   // Función para activar el banner cuando llegue una notificación de actividad
   const handleActivityNotification = (notification: any) => {
-    if (notification.type === 'activity' || notification.title?.includes('actividad') || notification.title?.includes('Actividad')) {
+    if (notification.type === 'review' || 
+        notification.title?.includes('Aprobada') || 
+        notification.title?.includes('Rechazada')) {
+      return;
+    }
+    
+    if (notification.type === 'activity' || 
+        notification.type === 'recurring_activity_assigned' ||
+        (notification.title?.includes('actividad') || notification.title?.includes('Actividad'))) {
       setHasUpdates(true);
       onDataChanged?.();
     }
