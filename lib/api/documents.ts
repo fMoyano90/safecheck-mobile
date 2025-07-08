@@ -46,7 +46,7 @@ export interface ActivityTemplate {
 
 export interface TemplateField {
   id: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location';
+  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode';
   label: string;
   placeholder?: string;
   required: boolean;
@@ -66,6 +66,29 @@ export interface TemplateField {
   accept?: string; // Para campos de archivo
   maxFiles?: number; // Para campos de foto
   defaultValue?: any;
+  config?: {
+    // Para location
+    showMap?: boolean;
+    accuracy?: number;
+    
+    // Para fileUpload
+    maxFileSize?: number;
+    allowedFileTypes?: string[];
+    
+    // Para rating
+    maxRating?: number;
+    allowHalf?: boolean;
+    
+    // Para slider
+    min?: number;
+    max?: number;
+    step?: number;
+    unit?: string;
+    
+    // Para qrCode
+    codeTypes?: string[];
+    validateFormat?: string;
+  };
 }
 
 // API functions para documentos

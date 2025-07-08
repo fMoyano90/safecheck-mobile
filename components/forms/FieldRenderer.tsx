@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface FieldRendererProps {
   fieldKey: string;
@@ -78,6 +79,86 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({ fieldKey, value })
     );
   };
 
+  // Renderizar ubicación
+  const renderLocation = (locationValue: any, fieldName: string) => {
+    return (
+      <View style={styles.textContainer}>
+        <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
+        <Text style={styles.fieldValue}>
+          📍 Lat: {locationValue.latitude?.toFixed(6) || 'N/A'}
+        </Text>
+        <Text style={styles.fieldValue}>
+          📍 Lng: {locationValue.longitude?.toFixed(6) || 'N/A'}
+        </Text>
+        {locationValue.accuracy && (
+          <Text style={styles.fieldValue}>
+            Precisión: ±{Math.round(locationValue.accuracy)}m
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  // Renderizar archivos
+  const renderFiles = (filesValue: any[], fieldName: string) => {
+    return (
+      <View style={styles.textContainer}>
+        <Text style={styles.fieldLabel}>
+          {formatFieldName(fieldName)} ({filesValue.length} archivo{filesValue.length > 1 ? 's' : ''}):
+        </Text>
+        {filesValue.map((file, index) => (
+          <View key={index} style={styles.textContainer}>
+            <Text style={styles.fieldValue}>
+              📄 {file.name || `Archivo ${index + 1}`}
+            </Text>
+            {file.size && (
+              <Text style={styles.fieldValue}>
+                Tamaño: {(file.size / 1024).toFixed(1)} KB
+              </Text>
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  // Renderizar calificación
+  const renderRating = (ratingValue: number, fieldName: string) => {
+    const stars = Array.from({ length: 5 }, (_, i) => i + 1 <= ratingValue ? '⭐' : '☆').join('');
+    return (
+      <View style={styles.textContainer}>
+        <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
+        <Text style={styles.fieldValue}>
+          {stars} ({ratingValue}/5)
+        </Text>
+      </View>
+    );
+  };
+
+  // Renderizar slider
+  const renderSlider = (sliderValue: number, fieldName: string) => {
+    return (
+      <View style={styles.textContainer}>
+        <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
+        <Text style={styles.fieldValue}>
+          Valor: {sliderValue}
+        </Text>
+      </View>
+    );
+  };
+
+  // Renderizar código QR
+  const renderQRCode = (qrValue: string, fieldName: string) => {
+    return (
+      <View style={styles.textContainer}>
+        <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
+        <Text style={styles.fieldValue}>
+          📱 {qrValue}
+        </Text>
+      </View>
+    );
+  };
+
   // Renderizar imagen base64 o URL
   const renderImage = (imageValue: string, fieldName: string) => {
     return (
@@ -120,6 +201,33 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({ fieldKey, value })
   };
 
   // Determinar el tipo de campo y renderizar apropiadamente
+  
+  // Casos especiales para nuevos tipos de campos
+  
+  // Ubicación
+  if (typeof value === 'object' && value !== null && 'latitude' in value && 'longitude' in value) {
+    return renderLocation(value, fieldKey);
+  }
+
+  // Archivos
+  if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && ('name' in value[0] || 'uri' in value[0])) {
+    return renderFiles(value, fieldKey);
+  }
+
+  // Calificación (números del 1 al 5)
+  if (typeof value === 'number' && value >= 1 && value <= 5 && /rating|calificacion|star/i.test(fieldKey)) {
+    return renderRating(value, fieldKey);
+  }
+
+  // Slider (números con configuración específica)
+  if (typeof value === 'number' && /slider|rango|range/i.test(fieldKey)) {
+    return renderSlider(value, fieldKey);
+  }
+
+  // Código QR
+  if (typeof value === 'string' && /qr|barcode|codigo/i.test(fieldKey)) {
+    return renderQRCode(value, fieldKey);
+  }
   
   // Caso 1: Array de imágenes
   if (isImageArray(value)) {
@@ -230,6 +338,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
+  },
+  // Estilos para nuevos tipos de campos
+  locationContainer: {
+    marginBottom: 16,
+    backgroundColor: '#FFF5F0',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF6D00',
+  },
+  locationInfo: {
+    gap: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#FF6D00',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  locationAccuracy: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    fontStyle: 'italic',
+  },
+  filesContainer: {
+    marginBottom: 16,
+  },
+  filesList: {
+    gap: 8,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+  },
+  fileName: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  ratingContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  ratingValue: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  sliderContainer: {
+    marginBottom: 16,
+  },
+  sliderValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0891B2',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 

@@ -10,17 +10,22 @@ import {
   Image,
   Platform,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as DocumentPicker from 'expo-document-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import Slider from '@react-native-community/slider';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import SignatureCanvas from 'react-native-signature-canvas';
 import { type TemplateField, type ActivityTemplate } from '@/lib/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -48,8 +53,19 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [signatures, setSignatures] = useState<{ [key: string]: string }>({});
   const [photos, setPhotos] = useState<{ [key: string]: string[] }>({});
   const [location, setLocation] = useState<{ [key: string]: any }>({});
+  const [files, setFiles] = useState<{ [key: string]: any[] }>({});
+  const [qrCodes, setQrCodes] = useState<{ [key: string]: string }>({});
+  const [showQrScanner, setShowQrScanner] = useState<string | null>(null);
   
   const signatureRef = useRef<any>(null);
+
+  // Hook para manejar permisos
+  const { 
+    permissions, 
+    requestCameraPermissionOnly, 
+    requestLocationPermissionOnly, 
+    requestMediaLibraryPermissionOnly 
+  } = usePermissions();
 
   // Dividir campos en páginas (6 campos por página para mejor UX)
   const fieldsPerPage = 6;
@@ -117,10 +133,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   // Funciones para manejar campos especiales
   const handleTakePhoto = async (fieldId: string) => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Error', 'Se requieren permisos de cámara');
-        return;
+      if (!permissions.camera) {
+        await requestCameraPermissionOnly();
+        if (!permissions.camera) {
+          Alert.alert('Error', 'Se requieren permisos de cámara');
+          return;
+        }
       }
 
       const result = await ImagePicker.launchCameraAsync({
@@ -143,10 +161,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   const handlePickPhoto = async (fieldId: string) => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Error', 'Se requieren permisos de galería');
-        return;
+      if (!permissions.mediaLibrary) {
+        await requestMediaLibraryPermissionOnly();
+        if (!permissions.mediaLibrary) {
+          Alert.alert('Error', 'Se requieren permisos de galería');
+          return;
+        }
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -169,10 +189,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   const handleGetLocation = async (fieldId: string) => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Error', 'Se requieren permisos de ubicación');
-        return;
+      if (!permissions.location) {
+        await requestLocationPermissionOnly();
+        if (!permissions.location) {
+          Alert.alert('Error', 'Se requieren permisos de ubicación');
+          return;
+        }
       }
 
       const currentLocation = await Location.getCurrentPositionAsync({});
@@ -200,6 +222,51 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     const newPhotos = currentPhotos.filter((_, i) => i !== index);
     setPhotos({ ...photos, [fieldId]: newPhotos });
     setValue(fieldId, newPhotos);
+  };
+
+  const handlePickFile = async (fieldId: string) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const currentFiles = files[fieldId] || [];
+        const newFiles = [...currentFiles, result.assets[0]];
+        setFiles({ ...files, [fieldId]: newFiles });
+        setValue(fieldId, newFiles);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo seleccionar el archivo');
+    }
+  };
+
+  const removeFile = (fieldId: string, index: number) => {
+    const currentFiles = files[fieldId] || [];
+    const newFiles = currentFiles.filter((_, i) => i !== index);
+    setFiles({ ...files, [fieldId]: newFiles });
+    setValue(fieldId, newFiles);
+  };
+
+  const handleScanQRCode = async (fieldId: string) => {
+    try {
+      if (!permissions.camera) {
+        await requestCameraPermissionOnly();
+        if (!permissions.camera) {
+          Alert.alert('Error', 'Se requieren permisos de cámara para escanear códigos');
+          return;
+        }
+      }
+      setShowQrScanner(fieldId);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo acceder a la cámara');
+    }
+  };
+
+  const handleBarCodeScanned = (fieldId: string, { type, data }: { type: string; data: string }) => {
+    setQrCodes({ ...qrCodes, [fieldId]: data });
+    setValue(fieldId, data);
+    setShowQrScanner(null);
   };
 
   const renderField = (field: TemplateField) => {
@@ -470,6 +537,105 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   </View>
                 );
 
+              case 'fileUpload':
+                return (
+                  <View style={styles.fileUploadContainer}>
+                    <TouchableOpacity
+                      style={styles.fileUploadButton}
+                      onPress={() => handlePickFile(field.id)}
+                    >
+                      <Ionicons name="document-attach" size={20} color="white" />
+                      <Text style={styles.fileUploadButtonText}>Seleccionar Archivo</Text>
+                    </TouchableOpacity>
+                    
+                    {files[field.id] && files[field.id].length > 0 && (
+                      <View style={styles.filesList}>
+                        {files[field.id].map((file, index) => (
+                          <View key={index} style={styles.fileItem}>
+                            <Ionicons name="document" size={24} color="#0891B2" />
+                            <Text style={styles.fileName}>{file.name}</Text>
+                            <TouchableOpacity
+                              style={styles.removeFileButton}
+                              onPress={() => removeFile(field.id, index)}
+                            >
+                              <Ionicons name="close-circle" size={20} color="#EF4444" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+
+              case 'rating':
+                return (
+                  <View style={styles.ratingContainer}>
+                    <View style={styles.ratingStars}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity
+                          key={star}
+                          style={styles.starButton}
+                          onPress={() => controllerField.onChange(star)}
+                        >
+                          <Ionicons
+                            name={star <= (controllerField.value || 0) ? "star" : "star-outline"}
+                            size={32}
+                            color={star <= (controllerField.value || 0) ? "#FFD700" : "#9CA3AF"}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={styles.ratingText}>
+                      {controllerField.value ? `${controllerField.value}/5` : 'Sin calificación'}
+                    </Text>
+                  </View>
+                );
+
+              case 'slider':
+                return (
+                  <View style={styles.sliderContainer}>
+                    <View style={styles.sliderLabels}>
+                      <Text style={styles.sliderLabel}>{field.config?.min || 0}</Text>
+                      <Text style={styles.sliderValue}>
+                        {controllerField.value || field.config?.min || 0}
+                        {field.config?.unit && ` ${field.config.unit}`}
+                      </Text>
+                      <Text style={styles.sliderLabel}>{field.config?.max || 100}</Text>
+                    </View>
+                    <Slider
+                      style={styles.slider}
+                      minimumValue={field.config?.min || 0}
+                      maximumValue={field.config?.max || 100}
+                      step={field.config?.step || 1}
+                      value={controllerField.value || field.config?.min || 0}
+                      onValueChange={controllerField.onChange}
+                      minimumTrackTintColor="#0891B2"
+                      maximumTrackTintColor="#E5E7EB"
+                    />
+                  </View>
+                );
+
+              case 'qrCode':
+                return (
+                  <View style={styles.qrCodeContainer}>
+                    <TouchableOpacity
+                      style={styles.qrCodeButton}
+                      onPress={() => handleScanQRCode(field.id)}
+                    >
+                      <Ionicons name="qr-code" size={20} color="white" />
+                      <Text style={styles.qrCodeButtonText}>Escanear Código</Text>
+                    </TouchableOpacity>
+                    
+                    {qrCodes[field.id] && (
+                      <View style={styles.qrCodeResult}>
+                        <Text style={styles.qrCodeResultText}>
+                          Código escaneado: {qrCodes[field.id]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+
               default:
                 return (
                   <TextInput
@@ -589,6 +755,37 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           )}
         </View>
       </View>
+
+      {/* Modal del scanner QR */}
+      <Modal
+        visible={!!showQrScanner}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={styles.qrScannerModal}>
+          <View style={styles.qrScannerHeader}>
+            <Text style={styles.qrScannerTitle}>Escanear Código QR</Text>
+            <TouchableOpacity
+              style={styles.qrScannerCloseButton}
+              onPress={() => setShowQrScanner(null)}
+            >
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          <CameraView
+            style={styles.qrScannerCamera}
+            onBarcodeScanned={(scanningResult) => {
+              if (showQrScanner) {
+                handleBarCodeScanned(showQrScanner, scanningResult);
+              }
+            }}
+          >
+            <View style={styles.qrScannerOverlay}>
+              <View style={styles.qrScannerFrame} />
+            </View>
+          </CameraView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -974,6 +1171,159 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '600',
     fontSize: 14,
+  },
+  // Estilos para nuevos tipos de campos
+  fileUploadContainer: {
+    gap: 16,
+  },
+  fileUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#7C3AED',
+    padding: 12,
+    borderRadius: 8,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  fileUploadButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  filesList: {
+    gap: 8,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+  },
+  fileName: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+  },
+  removeFileButton: {
+    padding: 4,
+  },
+  ratingContainer: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  starButton: {
+    padding: 4,
+  },
+  ratingText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  sliderContainer: {
+    gap: 12,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sliderLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  sliderValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0891B2',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderThumb: {
+    backgroundColor: '#0891B2',
+    width: 20,
+    height: 20,
+  },
+  qrCodeContainer: {
+    gap: 16,
+  },
+  qrCodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    padding: 12,
+    borderRadius: 8,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  qrCodeButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  qrCodeResult: {
+    backgroundColor: '#ECFDF5',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#059669',
+  },
+  qrCodeResultText: {
+    fontSize: 14,
+    color: '#065F46',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  // Estilos para modal de scanner QR
+  qrScannerModal: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  qrScannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  qrScannerTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  qrScannerCloseButton: {
+    padding: 8,
+  },
+  qrScannerCamera: {
+    flex: 1,
+  },
+  qrScannerOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    margin: 60,
+  },
+  qrScannerFrame: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderColor: '#fff',
+    borderWidth: 2,
+    borderRadius: 10,
   },
 });
 
