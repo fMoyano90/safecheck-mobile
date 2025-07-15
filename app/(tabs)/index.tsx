@@ -1376,7 +1376,7 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: "#0066cc", // Azul SafetyTech
+    color: "#0066cc", // Azul Núcleo Gestor
     fontWeight: "500",
     marginRight: 6,
   },
@@ -1497,7 +1497,7 @@ const styles = StyleSheet.create({
   },
   viewAllTextOrange: {
     fontSize: 14,
-    color: "#ff6d00", // Naranja SafetyTech
+    color: "#ff6d00", // Naranja Núcleo Gestor
     fontWeight: "500",
     marginRight: 6,
   },

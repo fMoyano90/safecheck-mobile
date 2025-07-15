@@ -54,7 +54,7 @@ export const authApi = {
 
   // Cerrar sesión (opcional - solo limpiar tokens localmente)
   logout: async (): Promise<void> => {
-    // El backend de SafetyTech no parece tener endpoint de logout
+    // El backend de Núcleo Gestor no parece tener endpoint de logout
     // Solo retornamos una promesa resuelta para mantener la compatibilidad
     return Promise.resolve();
   },

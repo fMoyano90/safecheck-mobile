@@ -271,7 +271,7 @@ export default function ScheduledActivitiesScreen() {
     switch (priority) {
       case 'urgent': return '#DC2626'; // Rojo urgente
       case 'high': return '#EF4444';   // Rojo alto
-      case 'medium': return '#ff6d00'; // Naranja SafetyTech
+      case 'medium': return '#ff6d00'; // Naranja Núcleo Gestor
       case 'low': return '#10B981';    // Verde bajo
       default: return '#6B7280';       // Gris por defecto
     }

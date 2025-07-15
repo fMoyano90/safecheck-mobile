@@ -59,8 +59,8 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#ff6d00'; // SafetyTech Orange
-      case 'submitted': return '#0066cc'; // SafetyTech Blue
+      case 'pending': return '#ff6d00'; // Núcleo Gestor Orange
+      case 'submitted': return '#0066cc'; // Núcleo Gestor Blue
       case 'completed': return '#10B981';
       case 'approved': return '#059669';
       case 'rejected': return '#EF4444';
@@ -85,7 +85,7 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
     switch (priority) {
       case 'urgent': return '#DC2626';
       case 'high': return '#EF4444';
-      case 'medium': return '#ff6d00'; // SafetyTech Orange
+      case 'medium': return '#ff6d00'; // Núcleo Gestor Orange
       case 'low': return '#10B981';
       default: return '#6B7280';
     }
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0066cc', // SafetyTech Blue
+    backgroundColor: '#0066cc', // Núcleo Gestor Blue
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#ff6d00', // SafetyTech Orange
+    borderLeftColor: '#ff6d00', // Núcleo Gestor Orange
   },
   footer: {
     backgroundColor: 'white',
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#ff6d00', // SafetyTech Orange
+    backgroundColor: '#ff6d00', // Núcleo Gestor Orange
     paddingVertical: 16,
     borderRadius: 12,
     shadowColor: '#ff6d00',

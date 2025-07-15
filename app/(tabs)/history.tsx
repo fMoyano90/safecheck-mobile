@@ -71,7 +71,7 @@ export default function HistoryScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return '#ff6d00'; // Naranja SafetyTech - Pendiente de revisión
+        return '#ff6d00'; // Naranja Núcleo Gestor - Pendiente de revisión
       case 'approved':
         return '#4CAF50'; // Verde - Aprobado
       case 'rejected':

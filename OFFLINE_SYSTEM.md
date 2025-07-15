@@ -1,8 +1,8 @@
-# Sistema Offline para SafetyTech Mobile
+# Sistema Offline para Núcleo Gestor Mobile
 
 ## 🎯 Objetivo
 
-Este sistema permite que la aplicación SafetyTech Mobile funcione completamente offline en entornos mineros con baja conectividad, guardando todas las acciones localmente y sincronizándolas automáticamente cuando se recupere la conexión.
+Este sistema permite que la aplicación Núcleo Gestor Mobile funcione completamente offline en entornos mineros con baja conectividad, guardando todas las acciones localmente y sincronizándolas automáticamente cuando se recupere la conexión.
 
 ## 🏗️ Arquitectura del Sistema
 

@@ -61,7 +61,7 @@ class NotificationService {
       // Configurar canal de notificaciones para Android
       if (Platform.OS === "android") {
         await Notifications.setNotificationChannelAsync("default", {
-          name: "SafetyTech Notifications",
+          name: "Núcleo Gestor Notifications",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#FF231F7C",

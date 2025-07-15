@@ -23,12 +23,12 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
-  // SafetyTech Brand Colors
-  safetyTech: {
+  // Núcleo Gestor Brand Colors
+  NucleoGestor: {
     primary: '#ff6d00',      // Naranja principal
     primaryLight: '#ff834d', // Naranja claro
     primaryDark: '#cc5200',  // Naranja oscuro
-    secondary: '#0066cc',    // Azul SafetyTech
+    secondary: '#0066cc',    // Azul Núcleo Gestor
     loading: '#ff6d00',      // Color para todos los loading indicators
     loadingLight: '#ff834d', // Color alternativo para loading
   }

@@ -142,7 +142,7 @@ export default function ProfileModal() {
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{fullName}</Text>
             <Text style={styles.userRole}>{user.role || 'Trabajador'}</Text>
-            <Text style={styles.userCompany}>SafetyTech Industries</Text>
+            <Text style={styles.userCompany}>Núcleo Gestor Industries</Text>
           </View>
 
           <View style={styles.userDetails}>
@@ -205,8 +205,8 @@ export default function ProfileModal() {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appInfoText}>SafetyTech Mobile v1.0.0</Text>
-          <Text style={styles.appInfoText}>© 2024 SafetyTech Industries</Text>
+          <Text style={styles.appInfoText}>Núcleo Gestor Mobile v1.0.0</Text>
+          <Text style={styles.appInfoText}>© 2024 Núcleo Gestor Industries</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#0066cc', // Azul SafetyTech
+    backgroundColor: '#0066cc', // Azul Núcleo Gestor
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0066cc',
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   },
   userRole: {
     fontSize: 16,
-    color: '#0066cc', // Azul SafetyTech
+    color: '#0066cc', // Azul Núcleo Gestor
     fontWeight: '600',
     marginBottom: 2,
   },
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e6f3ff', // Azul muy claro SafetyTech
+    backgroundColor: '#e6f3ff', // Azul muy claro Núcleo Gestor
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,

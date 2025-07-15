@@ -11,7 +11,7 @@ interface LoadingIndicatorProps {
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   size = 'large',
-  color = Colors.safetyTech.loading, // Usar la constante de color SafetyTech
+  color = Colors.NucleoGestor.loading, // Usar la constante de color Núcleo Gestor
   message,
   style
 }) => {
@@ -36,4 +36,4 @@ const styles = StyleSheet.create({
     color: '#737373',
     textAlign: 'center',
   },
-}); 
+});
