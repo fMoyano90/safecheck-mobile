@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity, Platform, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 
 interface FieldRendererProps {
   fieldKey: string;
@@ -79,22 +80,89 @@ export const FieldRenderer: React.FC<FieldRendererProps> = ({ fieldKey, value })
     );
   };
 
+  // Función para abrir Google Maps
+  const openInGoogleMaps = (latitude: number, longitude: number) => {
+    const url = Platform.select({
+      ios: `maps:0,0?q=${latitude},${longitude}`,
+      android: `geo:0,0?q=${latitude},${longitude}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+    });
+
+    Linking.canOpenURL(url!).then(supported => {
+      if (supported) {
+        Linking.openURL(url!);
+      } else {
+        // Fallback a la versión web de Google Maps
+        const webUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+        Linking.openURL(webUrl).catch(() => {
+          Alert.alert('Error', 'No se pudo abrir Google Maps');
+        });
+      }
+    }).catch(() => {
+      Alert.alert('Error', 'No se pudo abrir Google Maps');
+    });
+  };
+
   // Renderizar ubicación
   const renderLocation = (locationValue: any, fieldName: string) => {
+    const { latitude, longitude, accuracy } = locationValue;
+    
+    if (!latitude || !longitude) {
+      return (
+        <View style={styles.textContainer}>
+          <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
+          <Text style={styles.fieldValue}>Ubicación no disponible</Text>
+        </View>
+      );
+    }
+
+    // URL del mapa embebido usando OpenStreetMap
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude-0.002},${latitude-0.002},${longitude+0.002},${latitude+0.002}&layer=mapnik&marker=${latitude},${longitude}`;
+
     return (
-      <View style={styles.textContainer}>
+      <View style={styles.locationContainer}>
         <Text style={styles.fieldLabel}>{formatFieldName(fieldName)}:</Text>
-        <Text style={styles.fieldValue}>
-          📍 Lat: {locationValue.latitude?.toFixed(6) || 'N/A'}
-        </Text>
-        <Text style={styles.fieldValue}>
-          📍 Lng: {locationValue.longitude?.toFixed(6) || 'N/A'}
-        </Text>
-        {locationValue.accuracy && (
-          <Text style={styles.fieldValue}>
-            Precisión: ±{Math.round(locationValue.accuracy)}m
+        
+        {/* Información de coordenadas */}
+        <View style={styles.locationInfo}>
+          <Text style={styles.locationText}>
+            📍 Lat: {latitude.toFixed(6)}
           </Text>
-        )}
+          <Text style={styles.locationText}>
+            📍 Lng: {longitude.toFixed(6)}
+          </Text>
+          {accuracy && (
+            <Text style={styles.locationAccuracy}>
+              Precisión: ±{Math.round(accuracy)}m
+            </Text>
+          )}
+        </View>
+
+        {/* Mapa embebido */}
+        <View style={styles.mapContainer}>
+          <WebView
+            source={{ uri: mapUrl }}
+            style={styles.mapWebView}
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.mapLoading}>
+                <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
+              </View>
+            )}
+          />
+        </View>
+
+        {/* Botón para abrir en Google Maps */}
+        <TouchableOpacity 
+          style={styles.googleMapsButton}
+          onPress={() => openInGoogleMaps(latitude, longitude)}
+        >
+          <Ionicons name="map" size={20} color="#fff" />
+          <Text style={styles.googleMapsButtonText}>Abrir en Google Maps</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -349,6 +417,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#FF6D00',
   },
   locationInfo: {
+    marginBottom: 12,
     gap: 4,
   },
   locationText: {
@@ -360,6 +429,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7F8C8D',
     fontStyle: 'italic',
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  mapWebView: {
+    flex: 1,
+  },
+  mapLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  mapLoadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  googleMapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4285F4',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  googleMapsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   filesContainer: {
     marginBottom: 16,

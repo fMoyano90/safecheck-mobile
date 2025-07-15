@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import { documentsApi, type DocumentResponse } from '@/lib/api';
 import { FieldRenderer } from '@/components/forms/FieldRenderer';
+import { PdfDownloadButton } from '@/components/PdfDownloadButton';
 
 type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -213,7 +214,13 @@ export default function HistoryScreen() {
               <Ionicons name="close" size={24} color="#64748B" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Detalle del Documento</Text>
-            <View style={styles.placeholder} />
+            {selectedDocument?.activityId && (
+              <PdfDownloadButton 
+                activityId={selectedDocument.activityId}
+                variant="icon"
+                size="medium"
+              />
+            )}
           </View>
 
           <ScrollView style={styles.modalContent}>
@@ -318,6 +325,17 @@ export default function HistoryScreen() {
                 {Object.entries(selectedDocument.fields).map(([key, value]) => (
                   <FieldRenderer key={key} fieldKey={key} value={value} />
                 ))}
+              </View>
+            )}
+
+            {selectedDocument.activityId && (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionLabel}>Acciones</Text>
+                <PdfDownloadButton 
+                  activityId={selectedDocument.activityId}
+                  variant="button"
+                  size="large"
+                />
               </View>
             )}
           </ScrollView>
@@ -580,8 +598,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1e293b',
   },
-  placeholder: {
-    width: 32,
+  downloadButton: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
   },
   modalContent: {
     flex: 1,
