@@ -250,7 +250,7 @@ export default function ScheduledActivitiesScreen() {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'inspection': return 'search';
-      case 'training': return 'school';
+      case 'training': return 'clipboard-outline';
       case 'evaluation': return 'document-text';
       case 'meeting': return 'people';
       default: return 'calendar';
@@ -333,49 +333,70 @@ export default function ScheduledActivitiesScreen() {
     return marked;
   };
 
-  const renderActivityCard = (activity: ScheduledActivity) => (
-    <TouchableOpacity 
-      key={activity.id} 
-      style={styles.activityCard}
-      onPress={() => handleActivityPress(activity)}
-    >
-      <View style={styles.activityHeader}>
-        <View style={styles.activityTime}>
-          <Text style={styles.timeText}>{activity.time}</Text>
-          <Text style={styles.durationText}>{activity.estimatedDuration} min</Text>
-          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(activity.priority) }]}>
-            <Text style={styles.priorityText}>{getPriorityText(activity.priority)}</Text>
-          </View>
-        </View>
-        <View style={styles.activityContent}>
-          <Text style={styles.activityTitle}>{activity.title}</Text>
-          {activity.description && (
-            <Text style={styles.activityDescription}>{activity.description}</Text>
-          )}
-          <View style={styles.activityDetails}>
-            <View style={styles.detailRow}>
-              <Ionicons name="location-outline" size={14} color="#737373" />
-              <Text style={styles.locationText}>{activity.location}</Text>
+  const renderActivityCard = (activity: ScheduledActivity) => {
+    const isCompleted = activity.status === 'approved' || activity.status === 'completed' || activity.status === 'rejected';
+    
+    return (
+      <TouchableOpacity 
+        key={activity.id} 
+        style={[
+          styles.activityCard,
+          isCompleted && styles.completedActivityCard
+        ]}
+        onPress={() => handleActivityPress(activity)}
+      >
+        <View style={styles.activityHeader}>
+          <View style={styles.activityTime}>
+            <Text style={[styles.timeText, isCompleted && styles.completedText]}>{activity.time}</Text>
+            <Text style={[styles.durationText, isCompleted && styles.completedText]}>{activity.estimatedDuration} min</Text>
+            <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(activity.priority), opacity: isCompleted ? 0.6 : 1 }]}>
+              <Text style={styles.priorityText}>{getPriorityText(activity.priority)}</Text>
             </View>
-            {activity.assignedBy && (
-              <View style={styles.detailRow}>
-                <Ionicons name="person-outline" size={14} color="#737373" />
-                <Text style={styles.assignedText}>Asignado por: {activity.assignedBy}</Text>
-              </View>
+          </View>
+          <View style={styles.activityContent}>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.activityTitle, isCompleted && styles.completedText]}>{activity.title}</Text>
+              {isCompleted && (
+                <View style={styles.completedBadge}>
+                  <Ionicons 
+                    name={activity.status === 'approved' ? 'checkmark-circle' : activity.status === 'rejected' ? 'close-circle' : 'checkmark'} 
+                    size={16} 
+                    color={activity.status === 'approved' ? '#10b981' : activity.status === 'rejected' ? '#ef4444' : '#6b7280'} 
+                  />
+                  <Text style={styles.completedBadgeText}>
+                    {activity.status === 'approved' ? 'Aprobada' : activity.status === 'rejected' ? 'Rechazada' : 'Completada'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {activity.description && (
+              <Text style={[styles.activityDescription, isCompleted && styles.completedText]}>{activity.description}</Text>
             )}
+            <View style={styles.activityDetails}>
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={14} color={isCompleted ? "#9ca3af" : "#737373"} />
+                <Text style={[styles.locationText, isCompleted && styles.completedText]}>{activity.location}</Text>
+              </View>
+              {activity.assignedBy && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="person-outline" size={14} color={isCompleted ? "#9ca3af" : "#737373"} />
+                  <Text style={[styles.assignedText, isCompleted && styles.completedText]}>Asignado por: {activity.assignedBy}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <View style={styles.activityIcons}>
+            <Ionicons 
+              name={getActivityIcon(activity.type)} 
+              size={20} 
+              color={isCompleted ? '#9ca3af' : getActivityColor(activity.type)} 
+            />
+            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(activity.status) }]} />
           </View>
         </View>
-        <View style={styles.activityIcons}>
-          <Ionicons 
-            name={getActivityIcon(activity.type)} 
-            size={20} 
-            color={getActivityColor(activity.type)} 
-          />
-          <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(activity.status) }]} />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderAgendaView = () => {
     const today = (() => {
@@ -876,19 +897,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#dc2626',
-    textTransform: 'uppercase',
   },
   overdueTime: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 11,
     color: '#dc2626',
+    opacity: 0.8,
   },
   collapsibleSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 8,
+  },
+  // Estilos para actividades completadas
+  completedActivityCard: {
+    opacity: 0.7,
+    backgroundColor: '#f9fafb',
+  },
+  completedText: {
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  completedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
   },
 });

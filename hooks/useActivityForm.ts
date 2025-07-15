@@ -13,6 +13,7 @@ import {
   offlineStorage,
   useOfflineStatus 
 } from '@/lib/offline';
+import { useDocumentCacheInvalidation } from '@/hooks/useDocumentCache';
 
 interface UseActivityFormProps {
   activityId: number;
@@ -40,6 +41,9 @@ export const useActivityForm = ({
   
   // Hook para estado offline
   const { isOnline, canMakeRequests } = useOfflineStatus();
+  
+  // Hook para invalidar caché de documentos
+  const { invalidateDocumentCache } = useDocumentCacheInvalidation();
 
   // Cargar template al montar el componente
   useEffect(() => {
@@ -268,6 +272,9 @@ export const useActivityForm = ({
       
       // Limpiar borrador si existe
       await offlineStorage.deleteDraftForm(activityId);
+      
+      // Invalidar caché de documentos para que se actualice la lista
+      await invalidateDocumentCache();
       
       const successMessage = canMakeRequests 
         ? 'Formulario enviado correctamente'

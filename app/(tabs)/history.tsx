@@ -13,45 +13,37 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
-import { documentsApi, type DocumentResponse } from '@/lib/api';
+import { type DocumentResponse } from '@/lib/api';
 import { FieldRenderer } from '@/components/forms/FieldRenderer';
 import { PdfDownloadButton } from '@/components/PdfDownloadButton';
+import { useDocumentCache } from '@/hooks/useDocumentCache';
 
 type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
 
 export default function HistoryScreen() {
   const { user, isLoading } = useAuth();
-  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const {
+    documents,
+    loading,
+    refreshing,
+    lastUpdated,
+    error,
+    refresh,
+    isOnline,
+    canMakeRequests
+  } = useDocumentCache();
   const [filteredDocuments, setFilteredDocuments] = useState<DocumentResponse[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
   const [selectedDocument, setSelectedDocument] = useState<DocumentResponse | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  useEffect(() => {
-    if (user && !isLoading) {
-      loadDocuments();
-    }
-  }, [user, isLoading]);
+  // El hook useDocumentCache maneja la carga automática
 
   useEffect(() => {
     filterDocuments();
   }, [documents, selectedFilter]);
 
-  const loadDocuments = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const myDocuments = await documentsApi.getMyDocuments();
-      setDocuments(myDocuments);
-    } catch (err) {
-      console.error('Error loading documents:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // La función loadDocuments ahora es manejada por el hook useDocumentCache
 
   const filterDocuments = () => {
     let filtered = documents;
@@ -64,9 +56,7 @@ export default function HistoryScreen() {
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await loadDocuments();
-    setRefreshing(false);
+    await refresh();
   };
 
   const getStatusColor = (status: string) => {
@@ -378,9 +368,25 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Historial de Documentos</Text>
-        <Text style={styles.headerSubtitle}>
-          Formularios que has enviado ({filteredDocuments.length})
-        </Text>
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerSubtitle}>
+            Formularios que has enviado ({filteredDocuments.length})
+          </Text>
+          {!isOnline && (
+            <View style={styles.offlineIndicator}>
+              <Ionicons name="cloud-offline-outline" size={14} color="#ff6d00" />
+              <Text style={styles.offlineText}>Modo offline</Text>
+            </View>
+          )}
+          {lastUpdated && (
+            <Text style={styles.lastUpdatedText}>
+              Última actualización: {lastUpdated.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </Text>
+          )}
+        </View>
       </View>
 
       <View style={styles.filterContainer}>
@@ -447,9 +453,28 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 4,
   },
+  headerInfo: {
+    gap: 4,
+  },
   headerSubtitle: {
     fontSize: 14,
     color: '#64748b',
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  offlineText: {
+    fontSize: 12,
+    color: '#ff6d00',
+    fontWeight: '500',
+  },
+  lastUpdatedText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
   },
   centerContainer: {
     flex: 1,
