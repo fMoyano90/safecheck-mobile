@@ -116,7 +116,7 @@ const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
     template => template.status === 'submitted' || template.status === 'approved'
   );
 
-  const canCompleteActivity = activity.status === 'pending' && allFormsSubmitted;
+  const canCompleteActivity = (activity.status === 'pending' || activity.status === 'overdue') && allFormsSubmitted;
 
   const handleOpenForm = (templateId: number) => {
     router.push(`/form-demo?activityId=${activity.id}&activityType=scheduled&templateId=${templateId}`);
@@ -564,4 +564,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ActivityDetailsModal; 
+export default ActivityDetailsModal;

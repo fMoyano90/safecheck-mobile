@@ -383,7 +383,7 @@ export default function ScheduledActivitiesScreen() {
       return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
     })();
     const todayActivities = getActivitiesForDate(today);
-    const overdueActivities = activities.filter(activity => activity.date < today && activity.status === 'pending');
+    const overdueActivities = activities.filter(activity => activity.date < today && (activity.status === 'pending' || activity.status === 'overdue'));
     const upcomingActivities = activities.filter(activity => activity.date > today).slice(0, 10);
     const totalOverdueCount = overdueActivities.length;
 

@@ -41,6 +41,8 @@ type LocalActivity = {
   type: string;
   priority: string;
   status: string;
+  assignedDate: string;
+  date: string;
 };
 
 type QuickAction = {
@@ -121,6 +123,8 @@ const convertToLocalActivity = (activity: Activity): LocalActivity => {
     type,
     priority: activity.priority,
     status: activity.status,
+    assignedDate: activity.assignedDate,
+    date: `${assignedDate.getFullYear()}-${String(assignedDate.getMonth() + 1).padStart(2, '0')}-${String(assignedDate.getDate()).padStart(2, '0')}`,
   };
 };
 
@@ -171,6 +175,11 @@ const convertRecurringToLocalActivity = (
     type,
     priority: "medium", // Las actividades recurrentes no tienen prioridad definida
     status: recurringActivity.status === "active" ? "pending" : "completed",
+    assignedDate: new Date().toISOString(), // Para actividades recurrentes, usar fecha actual
+    date: (() => {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    })(),
   };
 };
 
@@ -271,19 +280,63 @@ export default function HomeScreen() {
         console.log("🔧 Cargando desde servidor...");
         // Modo online: cargar desde API y guardar en cache
         try {
-          console.log("🌐 Cargando actividades desde servidor...");
-          [allActivities, todayCompleted, recurring] = await Promise.all([
+          // Cargar actividades por status directamente<
+          const [pendingActivities, overdueActivities, completedActivities, recurringActivities] = await Promise.all([
             offlineActivitiesApi.getMyActivities({ status: "pending" }),
+            offlineActivitiesApi.getMyActivities({ status: "overdue" }),
             offlineActivitiesApi.getTodayCompleted(),
             recurringActivitiesApi.getActive(),
           ]);
-
+          
+          // Asignar directamente sin filtrado adicional complejo
+          todayCompleted = completedActivities;
+          recurring = recurringActivities;
+          
+          // Separar actividades pending por fecha (futuras vs hoy)
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const todayPendingActivities = pendingActivities.filter((activity) => {
+            const activityDate = new Date(activity.assignedDate);
+            activityDate.setHours(0, 0, 0, 0);
+            return activityDate.getTime() === today.getTime();
+          });
+          
+          const futurePendingActivities = pendingActivities.filter((activity) => {
+            const activityDate = new Date(activity.assignedDate);
+            activityDate.setHours(0, 0, 0, 0);
+            return activityDate.getTime() > today.getTime();
+          });
+          
+          // Combinar actividades de hoy con las vencidas
+          const todayAndOverdueActivities = [...todayPendingActivities, ...overdueActivities];
+          
           console.log(
-            `✅ Actividades cargadas: ${allActivities.length} pendientes, ${todayCompleted.length} completadas hoy, ${recurring.length} recurrentes`
+            `✅ Actividades cargadas: ${todayAndOverdueActivities.length} hoy/vencidas (${todayPendingActivities.length} hoy + ${overdueActivities.length} vencidas), ${futurePendingActivities.length} futuras, ${todayCompleted.length} completadas hoy, ${recurring.length} recurrentes`
           );
 
+          // Ordenar actividades
+          const sortedTodayAndOverdue = todayAndOverdueActivities.sort(
+            (a, b) =>
+              new Date(a.assignedDate).getTime() -
+              new Date(b.assignedDate).getTime()
+          );
+          
+          const sortedUpcoming = futurePendingActivities.sort(
+            (a, b) =>
+              new Date(a.assignedDate).getTime() -
+              new Date(b.assignedDate).getTime()
+          );
+
+          const convertedTodayActivities = sortedTodayAndOverdue.map(convertToLocalActivity);
+
+          setTodayActivities(convertedTodayActivities);
+          setCompletedActivities(todayCompleted.map(convertToLocalActivity));
+          setUpcomingActivities(sortedUpcoming);
+          setRecurringActivities(recurring);
+          
           // Guardar en almacenamiento offline para uso posterior
-          await offlineStorage.saveActivities(allActivities);
+          await offlineStorage.saveActivities([...pendingActivities, ...overdueActivities]);
           await offlineStorage.saveRecurringActivities(recurring);
           console.log(
             "💾 Actividades y actividades recurrentes guardadas en cache local"
@@ -302,19 +355,7 @@ export default function HomeScreen() {
         throw new Error("Sin conexión, usando modo offline");
       }
 
-      // Procesar y mostrar datos
-      const sortedUpcoming = allActivities.sort(
-        (a, b) =>
-          new Date(a.assignedDate).getTime() -
-          new Date(b.assignedDate).getTime()
-      );
-
-      const convertedActivities = sortedUpcoming.map(convertToLocalActivity);
-
-      setTodayActivities(convertedActivities);
-      setCompletedActivities(todayCompleted.map(convertToLocalActivity));
-      setUpcomingActivities(allActivities);
-      setRecurringActivities(recurring);
+      // Ya no necesitamos filtrado adicional - las actividades ya están organizadas correctamente
     } catch (error) {
       console.log("📱 Modo offline activado - cargando datos locales...");
       setIsOfflineMode(true);
@@ -347,7 +388,7 @@ export default function HomeScreen() {
         // Filtrar actividades pendientes y completadas
         const pendingActivities = activitiesData.filter(
           (activity) =>
-            activity.status === "pending" || activity.status === "assigned"
+            activity.status === "pending" || activity.status === "overdue"
         );
         const completedToday = activitiesData.filter((activity) => {
           const today = new Date().toDateString();
@@ -360,24 +401,42 @@ export default function HomeScreen() {
           (activity) => activity.status === "active"
         );
 
-        // Ordenar actividades pendientes
-        const sortedPending = pendingActivities.sort(
+        // Separar actividades pendientes por fecha (igual que en modo online)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const todayAndOverdueActivities = pendingActivities.filter((activity) => {
+          const activityDate = new Date(activity.assignedDate);
+          activityDate.setHours(0, 0, 0, 0);
+          return activityDate.getTime() <= today.getTime();
+        });
+        
+        const upcomingPendingActivities = pendingActivities.filter((activity) => {
+          const activityDate = new Date(activity.assignedDate);
+          activityDate.setHours(0, 0, 0, 0);
+          return activityDate.getTime() > today.getTime();
+        });
+
+        // Ordenar actividades
+        const sortedTodayAndOverdue = todayAndOverdueActivities.sort(
+          (a, b) =>
+            new Date(a.assignedDate).getTime() -
+            new Date(b.assignedDate).getTime()
+        );
+        
+        const sortedUpcoming = upcomingPendingActivities.sort(
           (a, b) =>
             new Date(a.assignedDate).getTime() -
             new Date(b.assignedDate).getTime()
         );
 
-        const convertedPending = sortedPending.map(convertToLocalActivity);
+        const convertedTodayAndOverdue = sortedTodayAndOverdue.map(convertToLocalActivity);
         const convertedCompleted = completedToday.map(convertToLocalActivity);
 
-        setTodayActivities(convertedPending);
+        setTodayActivities(convertedTodayAndOverdue);
         setCompletedActivities(convertedCompleted);
-        setUpcomingActivities(pendingActivities);
+        setUpcomingActivities(sortedUpcoming);
         setRecurringActivities(activeRecurringActivities);
-
-        console.log(
-          `📱 Cargadas ${convertedPending.length} actividades desde cache local`
-        );
       } catch (offlineError) {
         console.error("❌ Error cargando datos offline:", offlineError);
         // En último caso, mostrar datos vacíos
@@ -602,9 +661,42 @@ export default function HomeScreen() {
     }
   };
 
-  const totalActivities = todayActivities.length + completedActivities.length;
-  const pendingActivities = todayActivities.length;
+  // Calcular actividades vencidas usando la misma lógica que scheduled.tsx
+  const today = (() => {
+    const todayDate = new Date();
+    return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  })();
+  
+  // Separar actividades vencidas de las de hoy usando todayActivities (que ya incluye vencidas)
+  const overdueActivities = todayActivities.filter(activity => {
+    const activityDate = activity.date;
+    const isOverdue = activityDate < today;
+    console.log('🔍 Debug - Checking activity for overdue:', activity.title, 'Date:', activityDate, 'Today:', today, 'Status:', activity.status, 'IsOverdue:', isOverdue);
+    return isOverdue && (activity.status === 'overdue' || activity.status === 'pending');
+  });
+  
+  // Actividades solo de hoy (sin las vencidas)
+  const todayOnlyActivities = todayActivities.filter(activity => {
+    const activityDate = activity.date;
+    return activityDate === today;
+  });
+  
+  console.log('🔍 Debug - Overdue activities found:', overdueActivities.length);
+  console.log('🔍 Debug - Today only activities:', todayOnlyActivities.length);
+  console.log('🔍 Debug - Upcoming activities:', upcomingActivities.length);
+  
+  // Las actividades vencidas ahora se cargan correctamente del servidor
+  
+  // Calcular estadísticas correctamente
+  const totalTodayActivities = todayOnlyActivities.length + completedActivities.length; // Solo actividades de hoy
+  const pendingActivities = [...todayActivities, ...upcomingActivities].filter(activity => 
+    activity.status === 'pending' || activity.status === 'overdue'
+  ).length;
+  const overdueCount = overdueActivities.length;
   const completedCount = completedActivities.length;
+  
+  console.log('🔍 Debug - Final counts:', { totalTodayActivities, pendingActivities, overdueCount, completedCount });
+  console.log('🔍 Debug - overdueActivities for UI:', overdueActivities.length, overdueActivities.map(a => ({ id: a.id, title: a.title, date: a.date, assignedDate: a.assignedDate, status: a.status })));
 
   // Auto-refresh inteligente de actividades
   const {
@@ -672,10 +764,14 @@ export default function HomeScreen() {
 
           {/* Estadísticas del día */}
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{totalActivities}</Text>
-              <Text style={styles.statLabel}>Total del día</Text>
-            </View>
+            {overdueCount > 0 && (
+              <View style={[styles.statCard, styles.overdueStatCard]}>
+                <Text style={[styles.statNumber, { color: "#dc2626" }]}>
+                  {overdueCount}
+                </Text>
+                <Text style={[styles.statLabel, { color: "#dc2626" }]}>Vencidas</Text>
+              </View>
+            )}
             <View style={styles.statCard}>
               <Text style={[styles.statNumber, { color: "#ff6d00" }]}>
                 {pendingActivities}
@@ -687,6 +783,10 @@ export default function HomeScreen() {
                 {completedCount}
               </Text>
               <Text style={styles.statLabel}>Completadas</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{totalTodayActivities}</Text>
+              <Text style={styles.statLabel}>Total del día</Text>
             </View>
           </View>
 
@@ -872,21 +972,7 @@ export default function HomeScreen() {
           ) : (
             <>
               {/* Actividades Vencidas */}
-              {(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                const overdueActivities = todayActivities.filter((activity) => {
-                  const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
-                  if (!fullActivity) return false;
-                  
-                  const activityDate = new Date(fullActivity.assignedDate);
-                  activityDate.setHours(0, 0, 0, 0);
-                  
-                  return activityDate < today;
-                });
-
-                return overdueActivities.length > 0 ? (
+              {overdueActivities.length > 0 ? (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                       <FontAwesome name="exclamation-triangle" size={20} color="#dc2626" />
@@ -901,10 +987,11 @@ export default function HomeScreen() {
                     </View>
 
                     {overdueActivities.slice(0, 3).map((activity) => {
-                      const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
-                      const activityDate = fullActivity ? new Date(fullActivity.assignedDate) : new Date();
+                      const activityDate = activity.assignedDate ? activity.assignedDate.split('T')[0] : activity.date;
+                      const todayDate = new Date();
+                      const activityDateObj = new Date(activityDate);
                       
-                      const daysDiff = Math.floor((today.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24));
+                      const daysDiff = Math.floor((todayDate.getTime() - activityDateObj.getTime()) / (1000 * 60 * 60 * 24));
                       const dateLabel = daysDiff === 1 ? "Ayer" : `Hace ${daysDiff} días`;
 
                       return (
@@ -962,34 +1049,21 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-                ) : null;
-              })()}
+                ) : null}
 
               {/* Próximas Actividades */}
-              {(() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                const upcomingActivitiesFiltered = todayActivities.filter((activity) => {
-                  const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
-                  if (!fullActivity) return false;
-                  
-                  const activityDate = new Date(fullActivity.assignedDate);
-                  activityDate.setHours(0, 0, 0, 0);
-                  
-                  return activityDate >= today;
-                });
-
-                return upcomingActivitiesFiltered.length > 0 ? (
+              {upcomingActivities.length > 0 ? (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                       <FontAwesome name="clock-o" size={20} color="#1565c0" />
                       <Text style={styles.sectionTitle}>Próximas Actividades</Text>
                     </View>
 
-                    {upcomingActivitiesFiltered.slice(0, 4).map((activity) => {
-                      const fullActivity = upcomingActivities.find((a) => a.id === activity.id);
-                      const activityDate = fullActivity ? new Date(fullActivity.assignedDate) : new Date();
+                    {upcomingActivities.slice(0, 4).map((fullActivity) => {
+                      const activity = convertToLocalActivity(fullActivity);
+                      const activityDate = new Date(fullActivity.assignedDate);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
                       const tomorrow = new Date(today);
                       tomorrow.setDate(today.getDate() + 1);
 
@@ -1063,8 +1137,8 @@ export default function HomeScreen() {
                     >
                       <Text style={styles.viewAllText}>
                         Ver todas las programadas{" "}
-                        {upcomingActivitiesFiltered.length > 4
-                          ? `(${upcomingActivitiesFiltered.length} total)`
+                        {upcomingActivities.length > 4
+                          ? `(${upcomingActivities.length} total)`
                           : ""}
                       </Text>
                       <FontAwesome name="arrow-right" size={12} color="#0066cc" />
@@ -1094,8 +1168,7 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                );
-              })()}
+                )}
             </>
           )}
 
@@ -1572,5 +1645,12 @@ const styles = StyleSheet.create({
     color: "#dc2626", // red-600
     fontWeight: "600",
     marginRight: 6,
+  },
+  overdueStatCard: {
+    backgroundColor: "#fee2e2", // red-100
+    borderWidth: 1,
+    borderColor: "#fecaca", // red-200
+    borderLeftWidth: 4,
+    borderLeftColor: "#dc2626", // red-600
   },
 });
