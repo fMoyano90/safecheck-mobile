@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "safecheck-mobile",
-    "slug": "safecheck-mobile",
+    "name": "Núcleo Gestor",
+    "slug": "nucleo-gestor",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
