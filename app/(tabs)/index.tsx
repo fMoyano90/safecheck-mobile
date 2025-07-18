@@ -258,13 +258,10 @@ export default function HomeScreen() {
       setLoadingActivities(true);
       setIsOfflineMode(false);
 
-      // Verificar si el sistema offline está inicializado
       const OfflineSystem = require("@/lib/offline").OfflineSystem;
       const isInitialized = OfflineSystem.isInitialized();
-      console.log(`🔧 Sistema offline inicializado: ${isInitialized}`);
 
       if (!isInitialized) {
-        console.log("⏳ Esperando inicialización del sistema offline...");
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
@@ -272,12 +269,7 @@ export default function HomeScreen() {
       let todayCompleted: Activity[] = [];
       let recurring: RecurringActivity[] = [];
 
-      console.log(
-        `🔍 Estado de conexión: isOnline=${isOnline}, hasStrongConnection=${hasStrongConnection}`
-      );
-
       if (isOnline && hasStrongConnection) {
-        console.log("🔧 Cargando desde servidor...");
         // Modo online: cargar desde API y guardar en cache
         try {
           // Cargar todas las actividades del usuario (igual que scheduled.tsx)
@@ -323,9 +315,6 @@ export default function HomeScreen() {
           // Combinar actividades de hoy con las vencidas para mostrar en "hoy"
           const todayAndOverdueActivities = [...todayPendingActivities, ...overdueActivities];
           
-          console.log(
-            `✅ Actividades cargadas: ${todayPendingActivities.length} hoy, ${overdueActivities.length} vencidas, ${futurePendingActivities.length} futuras, ${todayCompleted.length} completadas hoy, ${recurring.length} recurrentes`
-          );
 
           // Ordenar actividades
           const sortedTodayAndOverdue = todayAndOverdueActivities.sort(
@@ -347,50 +336,22 @@ export default function HomeScreen() {
           setUpcomingActivities(sortedUpcoming);
           setRecurringActivities(recurring);
           
-          // Guardar en almacenamiento offline para uso posterior
           await offlineStorage.saveActivities(allActivities);
           await offlineStorage.saveRecurringActivities(recurring);
-          console.log(
-            "💾 Actividades y actividades recurrentes guardadas en cache local"
-          );
         } catch (error) {
-          console.warn(
-            "⚠️ Error cargando desde servidor, intentando cache local...",
-            error
-          );
-          throw error; // Permitir que caiga al modo offline
+          throw error;
         }
       } else {
-        console.log(
-          `❌ Sin conexión adecuada (isOnline: ${isOnline}, hasStrongConnection: ${hasStrongConnection}), usando modo offline`
-        );
         throw new Error("Sin conexión, usando modo offline");
       }
 
-      // Ya no necesitamos filtrado adicional - las actividades ya están organizadas correctamente
     } catch (error) {
-      console.log("📱 Modo offline activado - cargando datos locales...");
       setIsOfflineMode(true);
 
       try {
-        // Cargar actividades desde almacenamiento local
         const localActivities = await offlineStorage.getActivities();
         const localRecurringActivities =
           await offlineStorage.getRecurringActivities();
-        console.log(
-          `📱 Actividades en almacenamiento local: ${localActivities.length}`
-        );
-        console.log(
-          `📱 Actividades recurrentes en almacenamiento local: ${localRecurringActivities.length}`
-        );
-        console.log(
-          `📱 Datos de actividades locales:`,
-          localActivities.map((item) => ({
-            id: item.id,
-            status: item.data?.status,
-            assignedDate: item.data?.assignedDate,
-          }))
-        );
 
         const activitiesData = localActivities.map((item) => item.data);
         const recurringActivitiesData = localRecurringActivities.map(
@@ -509,7 +470,6 @@ export default function HomeScreen() {
           }));
         } catch (error) {
           console.error("Error cargando template:", error);
-          // Fallback: usar los templates expandidos si están disponibles, sino crear genéricos
           if (fullActivity.templates && fullActivity.templates.length > 0) {
             templates = fullActivity.templates.map((template) => ({
               id: template.id,
@@ -682,72 +642,50 @@ export default function HomeScreen() {
     }
   };
 
-  // Calcular actividades vencidas usando la misma lógica que scheduled.tsx
   const today = (() => {
     const todayDate = new Date();
     return `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
   })();
   
-  console.log('🔍 Debug - Today date string:', today);
-  console.log('🔍 Debug - All todayActivities:', todayActivities.map(a => ({ id: a.id, title: a.title, date: a.date, status: a.status })));
-  
-  // Separar actividades vencidas de las de hoy usando todayActivities (igual que scheduled.tsx)
   const overdueActivities = todayActivities.filter(activity => {
     const activityDate = activity.date;
-    const isOverdue = activityDate < today && (activity.status === 'pending' || activity.status === 'overdue');
-    console.log('🔍 Debug - Checking activity for overdue:', activity.title, 'Date:', activityDate, 'Today:', today, 'Status:', activity.status, 'IsOverdue:', isOverdue);
-    return isOverdue;
+    return activityDate < today && (activity.status === 'pending' || activity.status === 'overdue');
   });
   
-  // Actividades solo de hoy (sin las vencidas)
   const todayOnlyActivities = todayActivities.filter(activity => {
     const activityDate = activity.date;
-    const isToday = activityDate === today;
-    console.log('🔍 Debug - Checking activity for today:', activity.title, 'Date:', activityDate, 'Today:', today, 'Status:', activity.status, 'IsToday:', isToday);
-    return isToday;
+    return activityDate === today;
   });
   
-  console.log('🔍 Debug - Overdue activities found:', overdueActivities.length);
-  console.log('🔍 Debug - Today only activities:', todayOnlyActivities.length);
-  console.log('🔍 Debug - Upcoming activities:', upcomingActivities.length);
-  
-  // Calcular estadísticas correctamente (igual que scheduled.tsx)
-  const totalTodayActivities = todayOnlyActivities.length + completedActivities.length; // Solo actividades de hoy
-  const pendingActivities = overdueActivities.length + todayOnlyActivities.length + upcomingActivities.length; // Incluir vencidas como pendientes
+  const totalTodayActivities = todayOnlyActivities.length + completedActivities.length;
+  const pendingActivities = overdueActivities.length + todayOnlyActivities.length + upcomingActivities.length;
   const overdueCount = overdueActivities.length;
   const completedCount = completedActivities.length;
   
-  // Crear lista de actividades para mostrar en "Próximas Actividades" (incluye hoy + futuras)
-  // Necesitamos las actividades originales de hoy desde todayActivities que coincidan con todayOnlyActivities
   const todayOriginalActivities = todayActivities.filter(activity => {
     const activityDate = activity.date;
     return activityDate === today;
   });
   
-  // Buscar las actividades originales (Activity) correspondientes a las de hoy
   const todayActivityIds = todayOnlyActivities.map(a => a.id);
   const todayOriginalFromRaw = todayActivities.filter(localActivity => 
     todayActivityIds.includes(localActivity.id)
   );
   
-  // Crear lista combinada para la sección de próximas actividades
   const activitiesForUpcomingSection = [...todayOriginalFromRaw, ...upcomingActivities].map(activity => {
-    // Si es LocalActivity, necesitamos encontrar la Activity original
     if ('time' in activity) {
-      // Es LocalActivity, buscar en upcomingActivities o crear una Activity mock
       const found = upcomingActivities.find(a => a.id === activity.id);
       if (found) return found;
       
-      // Crear Activity mock desde LocalActivity
       return {
         id: activity.id,
-        userId: 0, // Mock value
+        userId: 0,
         templateIds: [],
         assignedDate: activity.assignedDate,
-        dueDate: activity.assignedDate, // Usar la misma fecha como fallback
+        dueDate: activity.assignedDate,
         status: activity.status as any,
         priority: activity.priority as any || 'medium',
-        assignedById: 0, // Mock value
+        assignedById: 0,
         activityName: activity.title,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -756,10 +694,6 @@ export default function HomeScreen() {
     }
     return activity;
   });
-  
-  console.log('🔍 Debug - Final counts:', { totalTodayActivities, pendingActivities, overdueCount, completedCount });
-  console.log('🔍 Debug - overdueActivities for UI:', overdueActivities.length, overdueActivities.map(a => ({ id: a.id, title: a.title, date: a.date, assignedDate: a.assignedDate, status: a.status })));
-  console.log('🔍 Debug - activitiesForUpcomingSection:', activitiesForUpcomingSection.length, activitiesForUpcomingSection.map(a => a ? { id: a.id, title: a.activityName, date: a.assignedDate } : null));
 
   // Auto-refresh inteligente de actividades
   const {
@@ -774,7 +708,7 @@ export default function HomeScreen() {
     enabled: !!user && !isLoading,
     manualRefreshOnly: true, // Solo mostrar banner por notificaciones push
     onDataChanged: () => {
-      console.log("📱 Nuevas actividades disponibles");
+      // New activities available
     },
   });
 

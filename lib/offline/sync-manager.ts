@@ -35,18 +35,14 @@ class SyncManager {
     networkManager.on('connected', this.handleConnectionRestored);
     networkManager.on('disconnected', this.handleConnectionLost);
     
-    // Verificar si hay elementos pendientes al iniciar
     const pendingItems = await offlineStorage.getSyncQueue();
     if (pendingItems.length > 0) {
       console.log(`🔄 ${pendingItems.length} elementos pendientes de sincronización`);
       
-      // Si hay conexión, iniciar sincronización
       if (networkManager.isOnline()) {
         this.startPeriodicSync();
       }
     }
-    
-    console.log('🔄 SyncManager inicializado');
   }
 
   private handleConnectionRestored = async () => {
@@ -62,12 +58,10 @@ class SyncManager {
 
   async syncNow(): Promise<SyncResult> {
     if (this.isRunning) {
-      console.log('⚠️ Sincronización ya en progreso');
       return { success: false, syncedItems: 0, failedItems: 0, errors: ['Sync already running'] };
     }
 
     if (!networkManager.canMakeRequests()) {
-      console.log('⚠️ No hay conexión disponible para sincronizar');
       return { success: false, syncedItems: 0, failedItems: 0, errors: ['No connection'] };
     }
 
@@ -77,35 +71,25 @@ class SyncManager {
     let failedItems = 0;
 
     try {
-      console.log('🔄 Iniciando sincronización...');
       this.notifyListeners({ isRunning: true, progress: 0, totalItems: 0 });
 
-      // Obtener cola de sincronización
       const queue = await offlineStorage.getSyncQueue();
       const eligibleItems = queue.filter(item => item.attempts < item.maxAttempts);
       
       if (eligibleItems.length === 0) {
-        console.log('✅ No hay elementos para sincronizar');
         return { success: true, syncedItems: 0, failedItems: 0, errors: [] };
       }
 
       console.log(`🔄 Sincronizando ${eligibleItems.length} elementos...`);
       
-      // Ordenar por prioridad y fecha
       const sortedItems = this.sortQueueByPriority(eligibleItems);
-      
-      // Procesar en lotes
       const batches = this.createBatches(sortedItems, this.config.batchSize);
       
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-        console.log(`🔄 Procesando lote ${i + 1}/${batches.length} (${batch.length} elementos)`);
-        
-        // Procesar elementos del lote en paralelo
         const batchPromises = batch.map(item => this.syncItem(item));
         const batchResults = await Promise.allSettled(batchPromises);
         
-        // Procesar resultados
         for (let j = 0; j < batchResults.length; j++) {
           const result = batchResults[j];
           const item = batch[j];
@@ -113,14 +97,12 @@ class SyncManager {
           if (result.status === 'fulfilled' && result.value.success) {
             syncedItems++;
             await offlineStorage.removeFromSyncQueue(item.id);
-            console.log(`✅ Elemento sincronizado: ${item.type}`);
           } else {
             failedItems++;
             const error = result.status === 'rejected' ? 
               result.reason.message : result.value.error;
             errors.push(`${item.type}: ${error}`);
             
-            // Actualizar intentos
             await offlineStorage.updateSyncQueueItem(item.id, {
               attempts: item.attempts + 1,
               lastError: error
@@ -130,7 +112,6 @@ class SyncManager {
           }
         }
         
-        // Actualizar progreso
         const progress = ((i + 1) / batches.length) * 100;
         this.notifyListeners({
           isRunning: true,
@@ -139,13 +120,11 @@ class SyncManager {
           currentItem: `Lote ${i + 1}/${batches.length}`
         });
         
-        // Pequeña pausa entre lotes para no sobrecargar
         if (i < batches.length - 1) {
           await this.delay(1000);
         }
       }
 
-      // Actualizar tiempo de última sincronización
       await offlineStorage.setLastSyncTime(new Date().toISOString());
       
       console.log(`✅ Sincronización completada: ${syncedItems} éxitos, ${failedItems} fallos`);
@@ -179,8 +158,6 @@ class SyncManager {
 
   private async syncItem(item: SyncQueueItem): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log(`🔄 Sincronizando: ${item.type} - ${item.endpoint}`);
-      
       switch (item.type) {
         case 'activity_complete':
           await this.syncActivityComplete(item);
@@ -213,7 +190,6 @@ class SyncManager {
       body: JSON.stringify(item.data),
     });
     
-    // Actualizar actividad local como sincronizada
     await offlineStorage.updateActivityStatus(item.data.activityId, {
       ...item.data.formData,
       syncStatus: 'synced'
@@ -228,7 +204,6 @@ class SyncManager {
       body: JSON.stringify(item.data),
     });
     
-    // Marcar documento como sincronizado
     const documents = await offlineStorage.getDocuments();
     const docIndex = documents.findIndex(d => d.id === item.data.documentId);
     if (docIndex !== -1) {
@@ -276,20 +251,16 @@ class SyncManager {
       if (networkManager.canMakeRequests()) {
         const queue = await offlineStorage.getSyncQueue();
         if (queue.length > 0) {
-          console.log('🔄 Sincronización periódica iniciada');
           await this.syncNow();
         }
       }
     }, this.config.syncInterval);
-    
-    console.log('⏰ Sincronización periódica activada');
   }
 
   private stopPeriodicSync(): void {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
-      console.log('⏰ Sincronización periódica desactivada');
     }
   }
 
@@ -349,7 +320,6 @@ class SyncManager {
     for (const item of queue) {
       await offlineStorage.removeFromSyncQueue(item.id);
     }
-    console.log('🧹 Cola de sincronización limpiada completamente');
   }
 }
 

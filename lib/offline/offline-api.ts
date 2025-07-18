@@ -27,9 +27,7 @@ class OfflineApiManager {
   };
 
   async initialize(): Promise<void> {
-    // Cargar cache desde almacenamiento persistente
     await this.loadCache();
-    console.log('📡 OfflineApiManager inicializado');
   }
 
   // === API WRAPPER PRINCIPAL ===
@@ -42,13 +40,9 @@ class OfflineApiManager {
     const method = (options.method || 'GET').toUpperCase();
     const cacheKey = this.getCacheKey(endpoint, method, options.body);
 
-    console.log(`📡 API Request: ${method} ${endpoint}`);
-
-    // Para métodos GET, intentar cache primero
     if (method === 'GET' && config.enableCache) {
       const cachedData = this.getFromCache<T>(cacheKey, config.cacheTimeout!);
       if (cachedData && !networkManager.isOnline()) {
-        console.log(`💾 Datos servidos desde cache offline: ${endpoint}`);
         return cachedData;
       }
     }
@@ -67,11 +61,9 @@ class OfflineApiManager {
       } catch (error) {
         console.error(`❌ Error en API request online: ${endpoint}`, error);
         
-        // Si hay error y tenemos cache, usar cache
         if (method === 'GET' && config.enableCache) {
-          const cachedData = this.getFromCache<T>(cacheKey, config.cacheTimeout! * 2); // Cache extendido en caso de error
+          const cachedData = this.getFromCache<T>(cacheKey, config.cacheTimeout! * 2);
           if (cachedData) {
-            console.log(`💾 Usando cache por error de red: ${endpoint}`);
             return cachedData;
           }
         }
@@ -80,22 +72,16 @@ class OfflineApiManager {
       }
     }
 
-    // Si no hay conexión
     if (method === 'GET') {
-      // Para GET, intentar cache
-      const cachedData = this.getFromCache<T>(cacheKey, config.cacheTimeout! * 4); // Cache muy extendido offline
+      const cachedData = this.getFromCache<T>(cacheKey, config.cacheTimeout! * 4);
       if (cachedData) {
-        console.log(`💾 Datos offline desde cache: ${endpoint}`);
         return cachedData;
       } else {
         throw new Error('No hay datos cached disponibles para esta consulta offline');
       }
     } else {
-      // Para métodos de escritura, añadir a cola de sincronización
       if (config.allowOfflineExecution) {
         await this.handleOfflineWriteOperation(endpoint, options, config);
-        
-        // Retornar una respuesta simulada para que la UI funcione
         return this.createOfflineResponse<T>(endpoint, options);
       } else {
         throw new Error('Operación no disponible offline');
@@ -115,10 +101,9 @@ class OfflineApiManager {
     try {
       data = options.body ? JSON.parse(options.body as string) : {};
     } catch (error) {
-      console.warn('⚠️ No se pudo parsear body para operación offline');
+      // Body parsing failed, using empty object
     }
 
-    // Determinar tipo de operación
     let operationType: any = 'document_create';
     
     if (endpoint.includes('/activities/') && endpoint.includes('/complete')) {
@@ -142,11 +127,9 @@ class OfflineApiManager {
       maxAttempts: 3,
     });
 
-    console.log(`📤 Operación añadida a cola offline: ${operationType} - ${endpoint}`);
   }
 
   private createOfflineResponse<T>(endpoint: string, options: RequestInit): T {
-    // Crear respuesta simulada basada en el tipo de operación
     const method = options.method?.toUpperCase() || 'POST';
     let mockResponse: any = { success: true, offline: true };
 
@@ -217,7 +200,6 @@ class OfflineApiManager {
       const cacheData = await offlineStorage.getItem<[string, CacheEntry][]>('api_cache');
       if (cacheData) {
         this.cache = new Map(cacheData);
-        console.log(`💾 Cache cargado: ${this.cache.size} entradas`);
       }
     } catch (error) {
       console.warn('⚠️ No se pudo cargar cache:', error);
@@ -228,7 +210,6 @@ class OfflineApiManager {
   async clearCache(): Promise<void> {
     this.cache.clear();
     await this.saveCache();
-    console.log('🧹 Cache limpiado');
   }
 
   async clearExpiredCache(): Promise<void> {
@@ -248,7 +229,6 @@ class OfflineApiManager {
 
     if (removedCount > 0) {
       await this.saveCache();
-      console.log(`🧹 ${removedCount} entradas de cache expiradas eliminadas`);
     }
   }
 

@@ -68,22 +68,17 @@ class NotificationService {
         });
       }
 
-      console.log("✅ Permisos de notificación configurados");
     } catch (error) {
       console.error("❌ Error configurando permisos de notificación:", error);
     }
   }
 
-  // Conectar al WebSocket del backend
   async connect() {
     try {
-      // Verificar si ya hay una conexión activa
       if (this.socket && this.isConnected) {
-        console.log("ℹ️ Ya hay una conexión WebSocket activa");
         return;
       }
 
-      // Desconectar socket anterior si existe pero no está conectado
       if (this.socket && !this.isConnected) {
         this.socket.disconnect();
         this.socket = null;
@@ -111,18 +106,15 @@ class NotificationService {
 
       this.setupSocketListeners();
 
-      console.log("🔌 Intentando conectar al WebSocket...");
     } catch (error) {
       console.error("❌ Error conectando al WebSocket:", error);
     }
   }
 
-  // Configurar listeners del socket
   private setupSocketListeners() {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      // Solo mostrar mensaje de conexión si está permitido
       if (connectivityConfig.shouldShowReconnectionMessages()) {
         console.log("✅ Conectado al WebSocket");
       }
@@ -132,7 +124,6 @@ class NotificationService {
     });
 
     this.socket.on("disconnect", (reason) => {
-      // Solo mostrar mensaje de desconexión si está permitido
       if (connectivityConfig.shouldShowReconnectionMessages()) {
         console.log("❌ Desconectado del WebSocket:", reason);
       }
@@ -141,7 +132,6 @@ class NotificationService {
     });
 
     this.socket.on("connect_error", (error) => {
-      // Solo mostrar error de conexión si está permitido
       if (connectivityConfig.shouldShowReconnectionMessages()) {
         console.error("❌ Error de conexión WebSocket:", error);
       }
@@ -149,12 +139,10 @@ class NotificationService {
       this.handleReconnection();
     });
 
-    // Escuchar notificaciones
     this.socket.on("notification", (notification: NotificationData) => {
       this.handleIncomingNotification(notification);
     });
 
-    // Escuchar eventos específicos de actividades
     this.socket.on("activity_assigned", (data) => {
       this.emit("activity_assigned", data);
     });
@@ -167,16 +155,13 @@ class NotificationService {
       this.emit("activity_reviewed", data);
     });
 
-    // Ping/pong para mantener conexión
     this.socket.on("pong", (data) => {
-      console.log("🏓 Pong recibido:", data);
+      // Pong received for connection health check
     });
   }
 
-  // Manejar reconexión automática
   private handleReconnection() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      // Solo mostrar mensaje si no está en modo silencioso
       if (connectivityConfig.shouldShowReconnectionMessages()) {
         console.error("❌ Máximo de intentos de reconexión alcanzado");
       }
@@ -184,9 +169,8 @@ class NotificationService {
     }
 
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Backoff exponencial
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
 
-    // Solo mostrar mensajes de reconexión si está permitido
     if (connectivityConfig.shouldShowReconnectionMessages()) {
       console.log(
         `🔄 Reintentando conexión en ${delay}ms (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
@@ -198,18 +182,10 @@ class NotificationService {
     }, delay);
   }
 
-  // Manejar notificación entrante
   private async handleIncomingNotification(notification: NotificationData) {
     try {
-      console.log("📱 Notificación recibida:", notification);
-
-      // Mostrar notificación push
       await this.showPushNotification(notification);
-
-      // Guardar notificación localmente
       await this.saveNotificationLocally(notification);
-
-      // Emitir evento para que los componentes puedan reaccionar
       this.emit("notification_received", notification);
     } catch (error) {
       console.error("❌ Error manejando notificación:", error);
@@ -256,25 +232,20 @@ class NotificationService {
     }
   }
 
-  // Guardar notificación localmente
   private async saveNotificationLocally(notification: NotificationData) {
     try {
       const existingNotifications = await this.getLocalNotifications();
-      
-      // Verificar si la notificación ya existe para evitar duplicados
       const existingIndex = existingNotifications.findIndex(n => n.id === notification.id);
       
       let updatedNotifications;
       if (existingIndex !== -1) {
-        // Si ya existe, actualizar la notificación existente
         updatedNotifications = [...existingNotifications];
         updatedNotifications[existingIndex] = notification;
       } else {
-        // Si no existe, agregar al inicio
         updatedNotifications = [
           notification,
           ...existingNotifications,
-        ].slice(0, 100); // Mantener solo las últimas 100
+        ].slice(0, 100);
       }
 
       await AsyncStorage.setItem(
@@ -286,23 +257,18 @@ class NotificationService {
     }
   }
 
-  // Limpiar notificaciones duplicadas del almacenamiento
   private async cleanDuplicateNotifications(): Promise<NotificationData[]> {
     try {
       const notifications = await AsyncStorage.getItem("local_notifications");
       if (!notifications) return [];
       
       const parsedNotifications: NotificationData[] = JSON.parse(notifications);
-      
-      // Eliminar duplicados basándose en el ID
       const uniqueNotifications = parsedNotifications.filter((notification, index, self) => 
         index === self.findIndex(n => n.id === notification.id)
       );
       
-      // Si había duplicados, guardar la versión limpia
       if (uniqueNotifications.length !== parsedNotifications.length) {
         await AsyncStorage.setItem("local_notifications", JSON.stringify(uniqueNotifications));
-        console.log(`🧹 Eliminadas ${parsedNotifications.length - uniqueNotifications.length} notificaciones duplicadas`);
       }
       
       return uniqueNotifications;

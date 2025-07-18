@@ -68,14 +68,10 @@ class OfflineStorage {
 
   async initialize(): Promise<void> {
     try {
-      // Crear directorio para archivos offline si no existe
       const dirInfo = await FileSystem.getInfoAsync(this.documentDir);
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(this.documentDir, { intermediates: true });
-        console.log('📁 Directorio offline creado');
       }
-      
-      console.log('💾 OfflineStorage inicializado');
     } catch (error) {
       console.error('❌ Error inicializando OfflineStorage:', error);
     }
@@ -91,7 +87,6 @@ class OfflineStorage {
     }));
 
     await this.setItem(STORAGE_KEYS.ACTIVITIES, offlineActivities);
-    console.log(`💾 ${activities.length} actividades guardadas offline`);
   }
 
   async getActivities(): Promise<OfflineActivity[]> {
@@ -113,7 +108,6 @@ class OfflineStorage {
       };
       
       await this.setItem(STORAGE_KEYS.ACTIVITIES, activities);
-      console.log(`💾 Actividad ${activityId} actualizada offline`);
     }
   }
 
@@ -127,7 +121,6 @@ class OfflineStorage {
     }));
 
     await this.setItem(STORAGE_KEYS.RECURRING_ACTIVITIES, offlineRecurringActivities);
-    console.log(`💾 ${recurringActivities.length} actividades recurrentes guardadas offline`);
   }
 
   async getRecurringActivities(): Promise<OfflineActivity[]> {
@@ -147,7 +140,6 @@ class OfflineStorage {
     }
     
     await this.setItem(STORAGE_KEYS.DOCUMENTS, documents);
-    console.log(`💾 Documento ${document.id} guardado offline`);
   }
 
   async getDocuments(): Promise<OfflineDocument[]> {
@@ -163,7 +155,6 @@ class OfflineStorage {
   // === MANEJO DE PLANTILLAS ===
   async saveTemplates(templates: any[]): Promise<void> {
     await this.setItem(STORAGE_KEYS.TEMPLATES, templates);
-    console.log(`💾 ${templates.length} plantillas guardadas offline`);
   }
 
   async getTemplates(): Promise<any[]> {
@@ -192,7 +183,6 @@ class OfflineStorage {
       });
     }
     
-    console.log(`💾 Archivo guardado: ${filename}`);
     return filePath;
   }
 
@@ -213,7 +203,6 @@ class OfflineStorage {
     
     try {
       await FileSystem.deleteAsync(filePath);
-      console.log(`🗑️ Archivo eliminado: ${filename}`);
     } catch (error) {
       console.warn(`⚠️ No se pudo eliminar archivo ${filename}:`, error);
     }
@@ -230,7 +219,6 @@ class OfflineStorage {
     
     queue.push(queueItem);
     await this.setItem(STORAGE_KEYS.SYNC_QUEUE, queue);
-    console.log(`📤 Ítem añadido a cola de sincronización: ${queueItem.type}`);
   }
 
   async getSyncQueue(): Promise<SyncQueueItem[]> {
@@ -242,7 +230,6 @@ class OfflineStorage {
     const queue = await this.getSyncQueue();
     const updatedQueue = queue.filter(item => item.id !== itemId);
     await this.setItem(STORAGE_KEYS.SYNC_QUEUE, updatedQueue);
-    console.log(`✅ Ítem removido de cola de sincronización: ${itemId}`);
   }
 
   async updateSyncQueueItem(itemId: string, updates: Partial<SyncQueueItem>): Promise<void> {
@@ -264,7 +251,6 @@ class OfflineStorage {
     };
     
     await this.setItem(STORAGE_KEYS.DRAFT_FORMS, drafts);
-    console.log(`💾 Borrador guardado para actividad ${activityId}`);
   }
 
   async getDraftForm(activityId: number): Promise<any | null> {
@@ -276,7 +262,6 @@ class OfflineStorage {
     const drafts = await this.getDraftForms();
     delete drafts[activityId.toString()];
     await this.setItem(STORAGE_KEYS.DRAFT_FORMS, drafts);
-    console.log(`🗑️ Borrador eliminado para actividad ${activityId}`);
   }
 
   private async getDraftForms(): Promise<Record<string, any>> {
@@ -331,7 +316,6 @@ class OfflineStorage {
       console.warn('⚠️ Error limpiando archivos offline:', error);
     }
     
-    console.log('🧹 Todos los datos offline eliminados');
   }
 
   async setLastSyncTime(timestamp: string): Promise<void> {

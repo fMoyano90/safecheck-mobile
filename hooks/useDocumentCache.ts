@@ -39,25 +39,19 @@ export function useDocumentCache() {
       const cached = await offlineStorage.getItem<CachedDocuments>(CACHE_KEY);
       
       if (!cached) {
-        console.log('📄 No hay caché de documentos disponible');
         return null;
       }
 
-      // Verificar versión del caché
       if (cached.version !== CACHE_VERSION) {
-        console.log('📄 Versión de caché obsoleta, limpiando...');
         await AsyncStorage.removeItem(CACHE_KEY);
         return null;
       }
 
-      // Verificar si el caché ha expirado
       const cacheAge = Date.now() - new Date(cached.timestamp).getTime();
       if (cacheAge > CACHE_DURATION) {
-        console.log('📄 Caché de documentos expirado');
         return null;
       }
 
-      console.log(`📄 Documentos cargados desde caché (${cached.documents.length} documentos)`);
       return cached.documents;
     } catch (error) {
       console.error('❌ Error cargando caché de documentos:', error);
@@ -75,21 +69,15 @@ export function useDocumentCache() {
       };
 
       await offlineStorage.setItem(CACHE_KEY, cacheData);
-      console.log(`📄 ${documents.length} documentos guardados en caché`);
     } catch (error) {
       console.error('❌ Error guardando caché de documentos:', error);
     }
   }, []);
 
-  // Cargar documentos desde la API
   const loadFromApi = useCallback(async (): Promise<DocumentResponse[]> => {
     try {
-      console.log('📄 Cargando documentos desde API...');
       const documents = await documentsApi.getMyDocuments();
-      
-      // Guardar en caché después de cargar desde API
       await saveToCache(documents);
-      
       return documents;
     } catch (error) {
       console.error('❌ Error cargando documentos desde API:', error);
@@ -119,11 +107,9 @@ export function useDocumentCache() {
         if (canMakeRequests) {
           documents = await loadFromApi();
         } else {
-          // Si no hay conexión, intentar cargar caché expirado como fallback
           const cached = await offlineStorage.getItem<CachedDocuments>(CACHE_KEY);
           if (cached && cached.version === CACHE_VERSION) {
             documents = cached.documents;
-            console.log('📄 Usando caché expirado como fallback (sin conexión)');
           } else {
             throw new Error('No hay conexión y no hay caché disponible');
           }
@@ -163,24 +149,18 @@ export function useDocumentCache() {
     }
   }, [canMakeRequests, loadFromCache, loadFromApi, state.documents.length]);
 
-  // Invalidar caché (llamar cuando se ejecute una nueva actividad)
   const invalidateCache = useCallback(async (): Promise<void> => {
     try {
       await AsyncStorage.removeItem(CACHE_KEY);
-      console.log('📄 Caché de documentos invalidado');
-      
-      // Recargar documentos después de invalidar
       await loadDocuments(true);
     } catch (error) {
       console.error('❌ Error invalidando caché:', error);
     }
   }, [loadDocuments]);
 
-  // Limpiar caché manualmente
   const clearCache = useCallback(async (): Promise<void> => {
     try {
       await AsyncStorage.removeItem(CACHE_KEY);
-      console.log('📄 Caché de documentos limpiado');
     } catch (error) {
       console.error('❌ Error limpiando caché:', error);
     }
@@ -210,10 +190,8 @@ export function useDocumentCache() {
   // Recargar cuando se recupere la conexión
   useEffect(() => {
     if (isOnline && canMakeRequests && state.documents.length > 0) {
-      // Solo recargar si el caché podría estar desactualizado
       isCacheValid().then(isValid => {
         if (!isValid) {
-          console.log('📄 Conexión recuperada, actualizando documentos...');
           loadDocuments(true);
         }
       });
@@ -245,7 +223,6 @@ export function useDocumentCacheInvalidation() {
   const invalidateDocumentCache = useCallback(async (): Promise<void> => {
     try {
       await AsyncStorage.removeItem(CACHE_KEY);
-      console.log('📄 Caché de documentos invalidado por nueva actividad');
     } catch (error) {
       console.error('❌ Error invalidando caché de documentos:', error);
     }

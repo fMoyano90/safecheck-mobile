@@ -29,34 +29,17 @@ export class OfflineSystem {
 
   static async initialize(): Promise<void> {
     if (this.initialized) {
-      console.log('⚠️ Sistema offline ya inicializado');
       return;
     }
 
     try {
-      console.log('🚀 Inicializando sistema offline...');
-
-      // Inicializar componentes en orden específico
-      console.log('1️⃣ Inicializando NetworkManager...');
       await networkManager.initialize();
-
-      console.log('2️⃣ Inicializando OfflineStorage...');
       await offlineStorage.initialize();
-
-      console.log('3️⃣ Inicializando OfflineApi...');
       await offlineApi.initialize();
-
-      console.log('4️⃣ Inicializando SyncManager...');
       await syncManager.initialize();
-
-      // Limpiar cache expirado al iniciar
-      console.log('🧹 Limpiando cache expirado...');
       await offlineApi.clearExpiredCache();
 
       this.initialized = true;
-      console.log('✅ Sistema offline inicializado correctamente');
-
-      // Reportar estado inicial
       this.reportSystemStatus();
       
     } catch (error) {
@@ -88,12 +71,6 @@ export class OfflineSystem {
     try {
       const status = await this.getSystemStatus();
       
-      console.log('📊 Estado del sistema offline:');
-      console.log('  🌐 Red:', status.network.isConnected ? '✅ Conectado' : '❌ Desconectado');
-      console.log('  💾 Actividades locales:', status.storage.totalActivities);
-      console.log('  📤 Cola de sincronización:', status.syncQueue.pending, 'pendientes');
-      console.log('  💽 Cache:', status.cache.entries, 'entradas,', status.cache.sizeKB, 'KB');
-      
       if (status.syncQueue.failed > 0) {
         console.warn('⚠️ ', status.syncQueue.failed, 'elementos fallidos en cola');
       }
@@ -107,8 +84,6 @@ export class OfflineSystem {
   }
 
   static async reset(): Promise<void> {
-    console.log('🔄 Reiniciando sistema offline...');
-    
     try {
       await offlineStorage.clearAllData();
       await offlineApi.clearCache();
@@ -116,8 +91,6 @@ export class OfflineSystem {
       
       this.initialized = false;
       await this.initialize();
-      
-      console.log('✅ Sistema offline reiniciado');
     } catch (error) {
       console.error('❌ Error reiniciando sistema offline:', error);
       throw error;
