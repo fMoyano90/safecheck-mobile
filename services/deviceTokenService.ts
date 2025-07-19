@@ -45,8 +45,16 @@ class DeviceTokenService {
       }
 
       // Obtener el token
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      
+      if (!projectId || projectId === 'your-project-id-here') {
+        console.error('❌ ProjectId no configurado. Por favor configura el projectId en app.json');
+        console.log('💡 Solución: Ejecuta "npx eas init" para configurar el proyecto');
+        return false;
+      }
+      
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        projectId: projectId,
       });
 
       this.token = tokenData.data;

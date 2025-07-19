@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Para desarrollo local usar: http://localhost:3030
 // Para emulador Android: http://10.0.2.2:3030  
 // Para dispositivo físico: usar IP local ej: http://192.168.1.X:3030
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3030';
+// Para producción: https://web-production-aefcf.up.railway.app
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://web-production-aefcf.up.railway.app';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: any) {
@@ -81,7 +82,9 @@ export const tokenManager = {
 
 // Función base para hacer requests
 export async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Agregar prefijo /api/v1 si no está presente
+  const fullEndpoint = endpoint.startsWith('/api/v1') ? endpoint : `/api/v1${endpoint}`;
+  const url = `${API_BASE_URL}${fullEndpoint}`;
   
   const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',

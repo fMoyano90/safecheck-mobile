@@ -84,12 +84,30 @@ export default function ProfileModal() {
       },
     },
     {
+      id: 'theme',
+      title: 'Tema',
+      description: 'Configurar modo claro, oscuro o sistema',
+      icon: 'color-palette-outline',
+      onPress: () => {
+        router.push('/theme-settings');
+      },
+    },
+    {
       id: 'notifications',
       title: 'Notificaciones',
       description: 'Configurar alertas y recordatorios',
       icon: 'notifications-outline',
       onPress: () => {
         Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+      },
+    },
+    {
+      id: 'connectivity',
+      title: 'Conectividad',
+      description: 'Configurar mensajes de conexión',
+      icon: 'wifi-outline',
+      onPress: () => {
+        router.push('/connectivity-settings');
       },
     },
     {

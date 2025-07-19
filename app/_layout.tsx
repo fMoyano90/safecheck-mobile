@@ -10,6 +10,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider } from '@/contexts/auth-context';
 import { NotificationProvider } from '@/contexts/notification-context';
 import { ConnectivityProvider } from '@/components/providers/ConnectivityProvider';
+import { ThemeProvider as AppThemeProvider } from '@/contexts/theme-context';
 import { OfflineSystem } from '@/lib/offline';
 
 export {
@@ -62,21 +63,24 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <AuthProvider>
-      <ConnectivityProvider defaultEnvironment="mining">
-        <NotificationProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="notifications" options={{ headerShown: false }} />
-              <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
-              <Stack.Screen name="connectivity-settings" options={{ headerShown: true, title: 'Conectividad' }} />
-            </Stack>
-          </ThemeProvider>
-        </NotificationProvider>
-      </ConnectivityProvider>
-    </AuthProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <ConnectivityProvider defaultEnvironment="mining">
+          <NotificationProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="notifications" options={{ headerShown: false }} />
+                <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
+                <Stack.Screen name="connectivity-settings" options={{ headerShown: true, title: 'Conectividad' }} />
+                <Stack.Screen name="theme-settings" options={{ headerShown: true, title: 'Tema' }} />
+              </Stack>
+            </ThemeProvider>
+          </NotificationProvider>
+        </ConnectivityProvider>
+      </AuthProvider>
+    </AppThemeProvider>
   );
 }
