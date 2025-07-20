@@ -464,6 +464,24 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   </View>
                 );
 
+              case 'info_image':
+                return (
+                  <View style={styles.referenceImageContainer}>
+                    {field.imageUrl && (
+                      <View style={styles.referenceImageWrapper}>
+                        <Image 
+                          source={{ uri: field.imageUrl }} 
+                          style={styles.referenceImage}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.referenceImageCaption}>
+                          {field.label || 'Imagen de referencia'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+
               case 'signature':
                 return (
                   <View style={styles.signatureContainer}>
@@ -630,6 +648,24 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       <View style={styles.qrCodeResult}>
                         <Text style={styles.qrCodeResultText}>
                           Código escaneado: {qrCodes[field.id]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+
+              case 'referenceImage':
+                return (
+                  <View style={styles.referenceImageContainer}>
+                    {field.config?.imageUrl && (
+                      <View style={styles.referenceImageWrapper}>
+                        <Image 
+                          source={{ uri: field.config.imageUrl }} 
+                          style={styles.referenceImage}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.referenceImageCaption}>
+                          {field.config.caption || 'Imagen de referencia'}
                         </Text>
                       </View>
                     )}
@@ -1325,6 +1361,31 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: 10,
   },
+  // Estilos para imagen de referencia
+  referenceImageContainer: {
+    marginVertical: 8,
+  },
+  referenceImageWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  referenceImage: {
+    width: screenWidth - 80,
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  referenceImageCaption: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 });
 
-export default FormRenderer; 
+export default FormRenderer;

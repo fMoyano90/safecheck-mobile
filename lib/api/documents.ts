@@ -46,10 +46,11 @@ export interface ActivityTemplate {
 
 export interface TemplateField {
   id: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode';
+  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode' | 'referenceImage' | 'info_image';
   label: string;
   placeholder?: string;
   required: boolean;
+  imageUrl?: string; // Para campos info_image
   validation?: {
     minLength?: number;
     maxLength?: number;
@@ -88,6 +89,10 @@ export interface TemplateField {
     // Para qrCode
     codeTypes?: string[];
     validateFormat?: string;
+    
+    // Para referenceImage
+    imageUrl?: string;
+    caption?: string;
   };
 }
 
@@ -158,4 +163,4 @@ export const documentsApi = {
   getById: async (id: string): Promise<DocumentResponse> => {
     return apiRequest<DocumentResponse>(`/api/v1/documents/${id}`);
   },
-}; 
+};
