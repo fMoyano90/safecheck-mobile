@@ -18,7 +18,6 @@ import * as Location from 'expo-location';
 import * as DocumentPicker from 'expo-document-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -56,6 +55,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [files, setFiles] = useState<{ [key: string]: any[] }>({});
   const [qrCodes, setQrCodes] = useState<{ [key: string]: string }>({});
   const [showQrScanner, setShowQrScanner] = useState<string | null>(null);
+  const [showSelectModal, setShowSelectModal] = useState<{ fieldId: string; options: any[] } | null>(null);
   
   const signatureRef = useRef<any>(null);
 
@@ -327,17 +327,22 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               case 'select':
               case 'select_choice':
                 return (
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={controllerField.value}
-                      onValueChange={controllerField.onChange}
-                      style={styles.picker}
+                  <View>
+                    <TouchableOpacity
+                      style={styles.selectButton}
+                      onPress={() => setShowSelectModal({ fieldId: field.id, options: field.options || [] })}
                     >
-                      <Picker.Item label="Selecciona una opción..." value="" />
-                      {field.options?.map((option) => (
-                        <Picker.Item key={option.value} label={option.label} value={option.value} />
-                      ))}
-                    </Picker>
+                      <Text style={[
+                        styles.selectButtonText,
+                        !controllerField.value && styles.selectPlaceholderText
+                      ]}>
+                        {controllerField.value 
+                          ? field.options?.find(opt => opt.value === controllerField.value)?.label 
+                          : 'Selecciona una opción...'
+                        }
+                      </Text>
+                      <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
                   </View>
                 );
 
@@ -823,6 +828,59 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           </CameraView>
         </View>
       </Modal>
+
+      {/* Modal de selección personalizado */}
+      <Modal
+        visible={!!showSelectModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSelectModal(null)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalContainer}>
+            <View style={styles.selectModalHeader}>
+              <Text style={styles.selectModalTitle}>Seleccionar opción</Text>
+              <TouchableOpacity
+                style={styles.selectModalCloseButton}
+                onPress={() => setShowSelectModal(null)}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.selectModalOptions}>
+              {showSelectModal?.options.map((option) => {
+                const currentField = template.structure.find(f => f.id === showSelectModal.fieldId);
+                const currentValue = watch(showSelectModal.fieldId);
+                const isSelected = currentValue === option.value;
+                
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.selectModalOption,
+                      isSelected && styles.selectModalOptionSelected
+                    ]}
+                    onPress={() => {
+                      setValue(showSelectModal.fieldId, option.value);
+                      setShowSelectModal(null);
+                    }}
+                  >
+                    <Text style={[
+                      styles.selectModalOptionText,
+                      isSelected && styles.selectModalOptionTextSelected
+                    ]}>
+                      {option.label}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={20} color="#0066cc" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -925,6 +983,28 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  selectButtonText: {
+    fontSize: 16,
+    color: '#34495e',
+  },
+  selectPlaceholderText: {
+    color: '#9CA3AF',
   },
   radioContainer: {
     gap: 12,
@@ -1386,6 +1466,68 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  // Estilos para modal de selección personalizado
+  selectModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  selectModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '70%',
+    minHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  selectModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  selectModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  selectModalCloseButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  selectModalOptions: {
+    maxHeight: 400,
+  },
+  selectModalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  selectModalOptionSelected: {
+    backgroundColor: '#EBF8FF',
+    borderBottomColor: '#BFDBFE',
+  },
+  selectModalOptionText: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  selectModalOptionTextSelected: {
+    color: '#0066cc',
+    fontWeight: '600',
   },
 });
 

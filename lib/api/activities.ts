@@ -72,7 +72,16 @@ export const activitiesApi = {
     const userId = profile.id;
     
     // Usar el endpoint específico del usuario para asegurar que solo vemos sus actividades
-    const activities = await apiRequest<Activity[]>(`/api/v1/activities/user/${userId}`);
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await apiRequest<{
+      data: Activity[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/v1/activities/user/${userId}`);
+    
+    const activities = response.data || [];
     
     // Aplicar filtros localmente si se proporcionan
     let filteredActivities = activities;
@@ -99,7 +108,16 @@ export const activitiesApi = {
 
   // Obtener actividades de un usuario específico (para supervisores/admins)
   getByUser: async (userId: number): Promise<Activity[]> => {
-    return apiRequest<Activity[]>(`/api/v1/activities/user/${userId}`);
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await apiRequest<{
+      data: Activity[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/v1/activities/user/${userId}`);
+    
+    return response.data || [];
   },
 
   // Obtener una actividad específica
@@ -166,4 +184,4 @@ export const activitiesApi = {
       endDate: endOfTomorrow.toISOString(),
     });
   },
-}; 
+};

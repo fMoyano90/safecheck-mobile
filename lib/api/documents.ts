@@ -156,7 +156,16 @@ export const documentsApi = {
     const queryString = queryParams.toString();
     const url = `/api/v1/documents/my${queryString ? `?${queryString}` : ''}`;
     
-    return apiRequest<DocumentResponse[]>(url);
+    // El backend ahora devuelve un objeto paginado, extraemos los documentos
+    const response = await apiRequest<{
+      data: DocumentResponse[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(url);
+    
+    return response.data || [];
   },
 
   // Obtener documento específico

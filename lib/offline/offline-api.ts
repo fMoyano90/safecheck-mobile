@@ -268,13 +268,22 @@ class OfflineApiManager {
     const userId = profile.id;
     
     // Usar el endpoint específico del usuario
-    return this.request<any[]>(`/api/v1/activities/user/${userId}`, {
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await this.request<{
+      data: any[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/v1/activities/user/${userId}`, {
       method: 'GET',
     }, {
       enableCache: true,
       cacheTimeout: 15, // 15 minutos para actividades
       priority: 'high',
     });
+    
+    return response.data || [];
   }
 
   async getRecurringActivities(): Promise<any[]> {
@@ -289,13 +298,22 @@ class OfflineApiManager {
     const userId = profile.id;
     
     // Usar el endpoint específico para actividades recurrentes del usuario
-    return this.request<any[]>(`/api/v1/recurring-activities/user/${userId}`, {
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await this.request<{
+      data: any[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/v1/recurring-activities/user/${userId}`, {
       method: 'GET',
     }, {
       enableCache: true,
       cacheTimeout: 30, // 30 minutos para actividades recurrentes
       priority: 'medium',
     });
+    
+    return response.data || [];
   }
 
   async completeActivity(activityId: number, formData: any): Promise<any> {

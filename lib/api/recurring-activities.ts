@@ -65,7 +65,31 @@ export const recurringActivitiesApi = {
     const userId = profile.id;
     
     // Usar el endpoint específico del usuario para asegurar que solo vemos sus actividades recurrentes
-    const activities = await apiRequest<RecurringActivity[]>(`/api/v1/recurring-activities/user/${userId}`);
+    const endpoint = `/api/v1/recurring-activities/user/${userId}`;
+    
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await apiRequest<{
+      data: RecurringActivity[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(endpoint);
+    
+    // El apiRequest ya extrae el .data del wrapper {success: true, data: ...}
+    // Pero ahora el .data contiene la estructura paginada {data: [], total, etc}
+    // Necesitamos extraer el array de actividades de response.data
+    let activities: RecurringActivity[] = [];
+    
+    if (response && typeof response === 'object') {
+      if (Array.isArray(response)) {
+        // Si response es directamente un array (formato antiguo)
+        activities = response;
+      } else if (response.data && Array.isArray(response.data)) {
+        // Si response tiene estructura paginada {data: [], total, etc}
+        activities = response.data;
+      }
+    }
     
     // Aplicar filtros localmente si se proporcionan
     let filteredActivities = activities;
@@ -94,7 +118,16 @@ export const recurringActivitiesApi = {
 
   // Obtener actividades recurrentes de un usuario específico (para supervisores/admins)
   getByUser: async (userId: number): Promise<RecurringActivity[]> => {
-    return apiRequest<RecurringActivity[]>(`/api/v1/recurring-activities/user/${userId}`);
+    // El backend ahora devuelve un objeto paginado, extraemos las actividades
+    const response = await apiRequest<{
+      data: RecurringActivity[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/v1/recurring-activities/user/${userId}`);
+    
+    return response.data || [];
   },
 
   // Obtener una actividad recurrente específica
@@ -141,4 +174,4 @@ export const recurringActivitiesApi = {
   getAvailableCategories: async (): Promise<Array<{ categoryId: number; categoryName: string; count: number }>> => {
     return apiRequest<Array<{ categoryId: number; categoryName: string; count: number }>>('/api/v1/recurring-activities/categories');
   },
-}; 
+};

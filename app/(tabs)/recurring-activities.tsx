@@ -55,26 +55,23 @@ export default function RecurringActivitiesScreen() {
 
 
 
-  // Función para convertir APIRecurringActivity a RecurringActivity local
   const convertToRecurringActivity = (activity: APIRecurringActivity): RecurringActivity => {
-    // Determinar categoría basada en template
     let category = 'General';
     let templates: string[] = [];
     if (activity.template) {
-      // Usar la categoría del template
       if (activity.template.category) {
         category = activity.template.category.name;
       }
       templates = [activity.template.name];
     }
 
-    // Título basado en el template
     let name = 'Actividad Recurrente';
-    if (activity.template) {
+    if (activity.template && activity.template.name) {
       name = activity.template.name;
+    } else {
+      name = `Actividad Recurrente #${activity.templateId}`;
     }
 
-    // Determinar frecuencia basada en el tipo del template
     let frequency = 'Según necesidad';
     if (activity.template?.type) {
       switch (activity.template.type.toLowerCase()) {
@@ -90,10 +87,10 @@ export default function RecurringActivitiesScreen() {
     return {
       id: activity.id,
       name,
-      description: activity.template?.description || 'Sin descripción adicional',
+      description: activity.template?.description || 'Actividad recurrente asignada',
       category,
       frequency,
-      estimatedTime: 30, // Valor por defecto
+      estimatedTime: 30,
       requiresSignature: false,
       requiresPhotos: false,
       lastCompleted: activity.lastCompleted,
@@ -109,19 +106,17 @@ export default function RecurringActivitiesScreen() {
   }, [user, isLoading]);
 
   const loadActivities = async () => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
 
     setLoading(true);
     try {
-      // Cargar actividades recurrentes del usuario
       const userRecurringActivities = await recurringActivitiesApi.getMyRecurringActivities();
-      
-      // Convertir a formato local
       const convertedActivities = userRecurringActivities.map(convertToRecurringActivity);
-      
       setActivities(convertedActivities);
     } catch (err) {
-      console.error('Error loading recurring activities:', err);
+      console.error('❌ Error loading recurring activities:', err);
       Alert.alert('Error', 'No se pudieron cargar las actividades recurrentes');
       setActivities([]);
     } finally {
@@ -319,7 +314,6 @@ export default function RecurringActivitiesScreen() {
     );
   }
 
-  // Mostrar loading si el usuario se está autenticando o cargando actividades
   if (isLoading || loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -333,7 +327,6 @@ export default function RecurringActivitiesScreen() {
     );
   }
 
-  // Si no hay usuario autenticado, mostrar mensaje
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
