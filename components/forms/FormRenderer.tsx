@@ -325,6 +325,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 );
 
               case 'select':
+              case 'select_choice':
                 return (
                   <View style={styles.pickerContainer}>
                     <Picker

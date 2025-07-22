@@ -46,7 +46,7 @@ export interface ActivityTemplate {
 
 export interface TemplateField {
   id: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode' | 'referenceImage' | 'info_image';
+  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'select_choice' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode' | 'referenceImage' | 'info_image';
   label: string;
   placeholder?: string;
   required: boolean;
