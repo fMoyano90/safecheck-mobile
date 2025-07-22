@@ -776,12 +776,6 @@ export default function HomeScreen() {
               <Text style={styles.statLabel}>Pendientes</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={[styles.statNumber, { color: "#1565c0" }]}>
-                {completedCount}
-              </Text>
-              <Text style={styles.statLabel}>Completadas</Text>
-            </View>
-            <View style={styles.statCard}>
               <Text style={styles.statNumber}>{totalTodayActivities}</Text>
               <Text style={styles.statLabel}>Total del día</Text>
             </View>
@@ -1286,6 +1280,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     alignItems: "center",
+    padding: 7,
+    borderRadius: 10,
   },
   statNumber: {
     fontSize: 24,
@@ -1647,7 +1643,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2", // red-100
     borderWidth: 1,
     borderColor: "#fecaca", // red-200
-    borderLeftWidth: 4,
-    borderLeftColor: "#dc2626", // red-600
   },
 });
