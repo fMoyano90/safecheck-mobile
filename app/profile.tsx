@@ -22,7 +22,7 @@ interface TabType {
 }
 
 const tabs: TabType[] = [
-  { id: 'profile', title: 'Información Personal', icon: 'person-outline' },
+  { id: 'profile', title: 'Mis Datos', icon: 'person-outline' },
   { id: 'password', title: 'Cambiar Contraseña', icon: 'key-outline' },
 ];
 

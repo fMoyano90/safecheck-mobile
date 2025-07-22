@@ -439,73 +439,93 @@ export default function HomeScreen() {
   };
 
   const handleActivityPress = async (localActivity: LocalActivity) => {
-    // Encontrar la actividad completa en upcomingActivities
-    const fullActivity = upcomingActivities.find(
-      (a) => a.id === localActivity.id
-    );
-    if (fullActivity) {
-      // Cargar los templates usando los templateIds (misma lógica que scheduled.tsx)
-      let templates: Array<{
-        id: number;
-        name: string;
-        description: string;
-        status: "pending";
-      }> = [];
-      if (fullActivity.templateIds && fullActivity.templateIds.length > 0) {
-        try {
-          // Obtener el template real del primer templateId
-          const templateData = await documentsApi.getActivityTemplate(
-            fullActivity.id
-          );
+    try {
+      // Buscar la actividad completa en upcomingActivities primero
+      let fullActivity = upcomingActivities.find(
+        (a) => a.id === localActivity.id
+      );
 
-          templates = fullActivity.templateIds.map((templateId, index) => ({
-            id: templateId,
-            name: index === 0 ? templateData.name : `Template ${templateId}`,
-            description:
-              index === 0
-                ? templateData.description ||
-                  "Formulario asignado a esta actividad"
-                : "Formulario asignado a esta actividad",
-            status: "pending" as const,
-          }));
+      // Si no se encuentra en upcomingActivities, buscar en las actividades originales
+      if (!fullActivity) {
+        // Obtener la actividad completa desde la API
+        try {
+          const activityData = await activitiesApi.getById(localActivity.id);
+          fullActivity = activityData;
         } catch (error) {
-          console.error("Error cargando template:", error);
-          if (fullActivity.templates && fullActivity.templates.length > 0) {
-            templates = fullActivity.templates.map((template) => ({
-              id: template.id,
-              name: template.name,
-              description:
-                template.description || "Formulario asignado a esta actividad",
-              status: "pending" as const,
-            }));
-          } else {
-            templates = fullActivity.templateIds.map((templateId, index) => ({
-              id: templateId,
-              name: localActivity.title || `Template ${templateId}`,
-              description: "Formulario asignado a esta actividad",
-              status: "pending" as const,
-            }));
-          }
+          console.error("Error obteniendo actividad:", error);
+          Alert.alert("Error", "No se pudo cargar la información de la actividad");
+          return;
         }
-      } else if (fullActivity.templates && fullActivity.templates.length > 0) {
-        // Si no hay templateIds pero sí templates expandidos
-        templates = fullActivity.templates.map((template) => ({
-          id: template.id,
-          name: template.name,
-          description:
-            template.description || "Formulario asignado a esta actividad",
-          status: "pending" as const,
-        }));
       }
 
-      // Convertir a formato del modal (idéntico a scheduled.tsx)
-      const activityForModal = {
-        ...fullActivity,
-        templates: templates,
-      };
+      if (fullActivity) {
+        // Cargar los templates usando los templateIds (misma lógica que scheduled.tsx)
+        let templates: Array<{
+          id: number;
+          name: string;
+          description: string;
+          status: "pending";
+        }> = [];
+        
+        if (fullActivity.templateIds && fullActivity.templateIds.length > 0) {
+          try {
+            // Obtener el template real del primer templateId
+            const templateData = await documentsApi.getActivityTemplate(
+              fullActivity.id
+            );
 
-      setSelectedActivity(activityForModal);
-      setModalVisible(true);
+            templates = fullActivity.templateIds.map((templateId, index) => ({
+              id: templateId,
+              name: index === 0 ? templateData.name : `Template ${templateId}`,
+              description:
+                index === 0
+                  ? templateData.description ||
+                    "Formulario asignado a esta actividad"
+                  : "Formulario asignado a esta actividad",
+              status: "pending" as const,
+            }));
+          } catch (error) {
+            console.error("Error cargando template:", error);
+            if (fullActivity.templates && fullActivity.templates.length > 0) {
+              templates = fullActivity.templates.map((template) => ({
+                id: template.id,
+                name: template.name,
+                description:
+                  template.description || "Formulario asignado a esta actividad",
+                status: "pending" as const,
+              }));
+            } else {
+              templates = fullActivity.templateIds.map((templateId, index) => ({
+                id: templateId,
+                name: localActivity.title || `Template ${templateId}`,
+                description: "Formulario asignado a esta actividad",
+                status: "pending" as const,
+              }));
+            }
+          }
+        } else if (fullActivity.templates && fullActivity.templates.length > 0) {
+          // Si no hay templateIds pero sí templates expandidos
+          templates = fullActivity.templates.map((template) => ({
+            id: template.id,
+            name: template.name,
+            description:
+              template.description || "Formulario asignado a esta actividad",
+            status: "pending" as const,
+          }));
+        }
+
+        // Convertir a formato del modal (idéntico a scheduled.tsx)
+        const activityForModal = {
+          ...fullActivity,
+          templates: templates,
+        };
+
+        setSelectedActivity(activityForModal);
+        setModalVisible(true);
+      }
+    } catch (error) {
+      console.error("Error en handleActivityPress:", error);
+      Alert.alert("Error", "No se pudo abrir la actividad. Inténtalo de nuevo.");
     }
   };
 
