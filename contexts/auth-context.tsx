@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authApi, tokenManager, LoginRequest, LoginResponse } from '@/lib/api';
+import { authApi, tokenManager, LoginRequest, LoginResponse, UpdateProfileRequest, ChangePasswordRequest } from '@/lib/api';
 
 interface User {
   id: number;
@@ -26,6 +26,8 @@ interface AuthContextType {
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  changePassword: (data: ChangePasswordRequest) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -131,6 +133,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const updateProfile = async (data: UpdateProfileRequest) => {
+    try {
+      const updatedUser = await authApi.updateProfile(data);
+      await tokenManager.setUserData(updatedUser);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
+  const changePassword = async (data: ChangePasswordRequest) => {
+    try {
+      await authApi.changePassword(data);
+    } catch (error) {
+      console.error('Error changing password:', error);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isLoading,
@@ -138,6 +160,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     refreshProfile,
+    updateProfile,
+    changePassword,
   };
 
   return (
@@ -153,4 +177,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}

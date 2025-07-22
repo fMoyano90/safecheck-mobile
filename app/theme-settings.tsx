@@ -51,11 +51,7 @@ export default function ThemeSettingsScreen() {
           </View>
         </View>
 
-        <ThemeSettings 
-          onThemeChange={(newThemeMode) => {
-            console.log('🎨 Tema cambiado a:', newThemeMode);
-          }}
-        />
+        <ThemeSettings />
       </ScrollView>
     </SafeAreaView>
   );
@@ -113,4 +109,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-}); 
+});

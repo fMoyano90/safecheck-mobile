@@ -74,13 +74,12 @@ export default function ProfileModal() {
 
   const profileOptions = [
     {
-      id: 'profile',
-      title: 'Mi Perfil',
-      description: 'Ver y editar información personal',
-      icon: 'person-outline',
+      id: 'permissions',
+      title: 'Permisos',
+      description: 'Configurar notificaciones, cámara y GPS',
+      icon: 'shield-checkmark-outline',
       onPress: () => {
-        // TODO: Implementar navegación a pantalla de edición de perfil
-        Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+        router.push('/permissions');
       },
     },
     {
@@ -93,39 +92,21 @@ export default function ProfileModal() {
       },
     },
     {
-      id: 'notifications',
-      title: 'Notificaciones',
-      description: 'Configurar alertas y recordatorios',
-      icon: 'notifications-outline',
+      id: 'profile',
+      title: 'Mi Perfil',
+      description: 'Ver y editar información personal',
+      icon: 'person-outline',
       onPress: () => {
-        Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+        router.push('/profile');
       },
     },
     {
       id: 'connectivity',
       title: 'Conectividad',
-      description: 'Configurar mensajes de conexión',
+      description: 'Configurar trabajo offline',
       icon: 'wifi-outline',
       onPress: () => {
         router.push('/connectivity-settings');
-      },
-    },
-    {
-      id: 'settings',
-      title: 'Configuración',
-      description: 'Preferencias de la aplicación',
-      icon: 'settings-outline',
-      onPress: () => {
-        Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
-      },
-    },
-    {
-      id: 'help',
-      title: 'Ayuda y Soporte',
-      description: 'Obtener ayuda y contactar soporte',
-      icon: 'help-circle-outline',
-      onPress: () => {
-        Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
       },
     },
   ];
@@ -159,8 +140,7 @@ export default function ProfileModal() {
           
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{fullName}</Text>
-            <Text style={styles.userRole}>{user.role || 'Trabajador'}</Text>
-            <Text style={styles.userCompany}>Núcleo Gestor Industries</Text>
+            <Text style={styles.userRole}>{user.role === 'worker' ? 'Trabajador' : user.role || 'Usuario'}</Text>
           </View>
 
           <View style={styles.userDetails}>
@@ -224,7 +204,6 @@ export default function ProfileModal() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appInfoText}>Núcleo Gestor Mobile v1.0.0</Text>
-          <Text style={styles.appInfoText}>© 2024 Núcleo Gestor Industries</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -288,7 +267,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#0066cc', // Azul Núcleo Gestor
+    backgroundColor: '#0066cc',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0066cc',
@@ -314,13 +293,9 @@ const styles = StyleSheet.create({
   },
   userRole: {
     fontSize: 16,
-    color: '#0066cc', // Azul Núcleo Gestor
+    color: '#0066cc',
     fontWeight: '600',
-    marginBottom: 2,
-  },
-  userCompany: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    marginBottom: 8,
   },
   userDetails: {
     gap: 12,
@@ -358,7 +333,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e6f3ff', // Azul muy claro Núcleo Gestor
+    backgroundColor: '#e6f3ff',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,

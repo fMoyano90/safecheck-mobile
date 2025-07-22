@@ -34,6 +34,19 @@ export interface RefreshTokenRequest {
   refreshToken: string;
 }
 
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  emergencyContactPhone?: string;
+  position?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 // API functions para autenticación
 export const authApi = {
   // Iniciar sesión
@@ -79,4 +92,20 @@ export const authApi = {
       body: JSON.stringify({ token, password: newPassword }),
     });
   },
-}; 
+
+  // Actualizar perfil del usuario
+  updateProfile: async (data: UpdateProfileRequest): Promise<LoginResponse['user']> => {
+    return apiRequest<LoginResponse['user']>('/api/v1/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Cambiar contraseña
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    return apiRequest<void>('/api/v1/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};

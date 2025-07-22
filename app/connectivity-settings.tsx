@@ -59,11 +59,7 @@ export default function ConnectivitySettingsScreen() {
           </View>
         </View>
 
-        <ConnectivitySettings 
-          onConfigChange={(newConfig) => {
-            console.log('🔧 Configuración actualizada:', newConfig);
-          }}
-        />
+        <ConnectivitySettings />
 
         <View style={styles.infoContainer}>
           <Text style={styles.infoTitle}>ℹ️ Información</Text>

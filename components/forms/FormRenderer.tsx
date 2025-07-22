@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as DocumentPicker from 'expo-document-picker';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView } from 'expo-camera';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Slider from '@react-native-community/slider';
 import { useForm, Controller } from 'react-hook-form';
@@ -58,6 +58,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [showSelectModal, setShowSelectModal] = useState<{ fieldId: string; options: any[] } | null>(null);
   
   const signatureRef = useRef<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Hook para manejar permisos
   const { 
@@ -745,7 +746,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       </View>
 
       {/* Campos del formulario */}
-      <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.formContainer} 
+        showsVerticalScrollIndicator={false}
+      >
         {currentFields.map(renderField)}
       </ScrollView>
 
@@ -755,7 +760,13 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           {currentPage > 0 && (
             <TouchableOpacity
               style={[styles.navButton, styles.navButtonSecondary, styles.navButtonIcon]}
-              onPress={() => setCurrentPage(currentPage - 1)}
+              onPress={() => {
+                setCurrentPage(currentPage - 1);
+                // Scroll automático al inicio del formulario
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                }, 100);
+              }}
             >
               <Ionicons name="chevron-back" size={20} color="#0066cc" />
             </TouchableOpacity>
@@ -774,7 +785,13 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           {currentPage < totalPages - 1 ? (
             <TouchableOpacity
               style={styles.navButton}
-              onPress={() => setCurrentPage(currentPage + 1)}
+              onPress={() => {
+                setCurrentPage(currentPage + 1);
+                // Scroll automático al inicio del formulario
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                }, 100);
+              }}
             >
               <Text style={styles.navButtonText}>Siguiente</Text>
               <Ionicons name="chevron-forward" size={20} color="white" />
