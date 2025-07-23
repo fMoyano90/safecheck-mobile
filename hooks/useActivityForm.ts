@@ -492,6 +492,23 @@ export const useActivityForm = ({
         templateName: template?.name,
         enrichedResponses: _enrichedResponses, // Estructura enriquecida para revisiones
       },
+      // Estructura enriquecida en campos separados para el backend
+      templateSnapshot: template ? {
+        id: template.id,
+        name: template.name,
+        type: template.type || 'form',
+        description: template.description,
+        structure: template.structure,
+      } : undefined,
+      responses: _enrichedResponses,
+      submissionMetadata: {
+        submittedAt: new Date().toISOString(),
+        deviceInfo: {
+          platform: 'mobile',
+          version: '1.0.0',
+          screenWidth: 0, // Se puede obtener del dispositivo si es necesario
+        },
+      },
     };
 
     if (locationData) {

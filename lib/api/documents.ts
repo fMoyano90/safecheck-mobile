@@ -8,6 +8,49 @@ export interface DocumentFormData {
   metadata?: Record<string, any>;
   startedAt?: string;
   locationData?: Record<string, any>;
+  // Estructura enriquecida
+  templateSnapshot?: {
+    id: number;
+    name: string;
+    type: string;
+    description?: string;
+    structure: any;
+  };
+  responses?: {
+    sections: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      questions: Array<{
+        id: string;
+        text: string;
+        type: string;
+        required: boolean;
+        placeholder?: string;
+        options?: Array<{ label: string; value: string }>;
+        content?: string;
+        answer: {
+          value: any;
+          timestamp: string;
+          metadata?: {
+            location?: any;
+            photos?: string[];
+            signature?: string;
+            files?: any[];
+            qrCode?: string;
+          };
+        };
+      }>;
+    }>;
+  };
+  submissionMetadata?: {
+    submittedAt: string;
+    deviceInfo?: {
+      platform: string;
+      version: string;
+      screenWidth: number;
+    };
+  };
 }
 
 export interface DocumentResponse {
