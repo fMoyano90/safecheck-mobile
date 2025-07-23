@@ -273,6 +273,53 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const renderField = (field: TemplateField) => {
     const hasError = !!errors[field.id];
     
+    // Campos especiales que no necesitan label ni contenedor estándar
+    if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer') {
+      return (
+        <View key={field.id}>
+          <Controller
+            name={field.id}
+            control={control}
+            render={({ field: controllerField }) => {
+              switch (field.type) {
+                case 'sectionHeader':
+                  const level = field.config?.level || 2;
+                  const headerStyle = [
+                    styles.sectionHeader,
+                    level === 1 && styles.sectionHeaderH1,
+                    level === 2 && styles.sectionHeaderH2,
+                    level === 3 && styles.sectionHeaderH3,
+                    level === 4 && styles.sectionHeaderH4,
+                    level === 5 && styles.sectionHeaderH5,
+                    level === 6 && styles.sectionHeaderH6,
+                  ];
+                  return (
+                    <View style={styles.sectionHeaderContainer}>
+                      <Text style={headerStyle}>{field.label}</Text>
+                    </View>
+                  );
+
+                case 'paragraph':
+                  return (
+                    <View style={styles.paragraphContainer}>
+                      <Text style={styles.paragraphText}>
+                        {field.config?.content || field.label || 'Texto del párrafo...'}
+                      </Text>
+                    </View>
+                  );
+
+                case 'spacer':
+                  return <View style={styles.spacer} />;
+
+                default:
+                  return <View />;
+              }
+            }}
+          />
+        </View>
+      );
+    }
+    
     return (
       <View key={field.id} style={[styles.fieldContainer, hasError && styles.fieldError]}>
         <Text style={styles.fieldLabel}>
@@ -401,6 +448,21 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               case 'date':
               case 'time':
               case 'datetime':
+                const formatDate = (date: Date, type: string) => {
+                  const options: Intl.DateTimeFormatOptions = {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  };
+                  
+                  if (type === 'time') {
+                    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                  } else if (type === 'datetime') {
+                    return date.toLocaleDateString('es-ES', options) + ' ' + date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                  }
+                  return date.toLocaleDateString('es-ES', options);
+                };
+                
                 return (
                   <View>
                     <TouchableOpacity
@@ -409,7 +471,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     >
                       <Text style={styles.dateButtonText}>
                         {controllerField.value 
-                          ? new Date(controllerField.value).toLocaleDateString('es-ES')
+                          ? formatDate(new Date(controllerField.value), field.type)
                           : field.placeholder || 'Seleccionar fecha'
                         }
                       </Text>
@@ -417,17 +479,35 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     </TouchableOpacity>
                     
                     {showDatePicker?.field === field.id && (
-                      <DateTimePicker
-                        value={controllerField.value ? new Date(controllerField.value) : new Date()}
-                        mode={showDatePicker.mode}
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                          setShowDatePicker(null);
-                          if (selectedDate) {
-                            controllerField.onChange(selectedDate.toISOString());
-                          }
-                        }}
-                      />
+                      <Modal
+                        transparent={true}
+                        animationType="slide"
+                        visible={showDatePicker?.field === field.id}
+                        onRequestClose={() => setShowDatePicker(null)}
+                      >
+                        <View style={styles.modalOverlay}>
+                          <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                              <Text style={styles.modalTitle}>Seleccionar {field.type === 'time' ? 'hora' : field.type === 'datetime' ? 'fecha y hora' : 'fecha'}</Text>
+                              <TouchableOpacity onPress={() => setShowDatePicker(null)}>
+                                <Ionicons name="close" size={24} color="#666" />
+                              </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                              value={controllerField.value ? new Date(controllerField.value) : new Date()}
+                              mode={showDatePicker.mode}
+                              display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                              locale="es-ES"
+                              onChange={(event, selectedDate) => {
+                                if (selectedDate) {
+                                  controllerField.onChange(selectedDate.toISOString());
+                                }
+                                setShowDatePicker(null);
+                              }}
+                            />
+                          </View>
+                        </View>
+                      </Modal>
                     )}
                   </View>
                 );
@@ -1545,6 +1625,84 @@ const styles = StyleSheet.create({
   selectModalOptionTextSelected: {
     color: '#0066cc',
     fontWeight: '600',
+  },
+  // Estilos para modal de DateTimePicker
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  // Estilos para elementos de diseño
+  sectionHeaderContainer: {
+    marginVertical: 16,
+    marginBottom: 8,
+  },
+  sectionHeader: {
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  sectionHeaderH1: {
+    fontSize: 28,
+    marginBottom: 12,
+  },
+  sectionHeaderH2: {
+    fontSize: 24,
+    marginBottom: 10,
+  },
+  sectionHeaderH3: {
+    fontSize: 20,
+    marginBottom: 8,
+  },
+  sectionHeaderH4: {
+    fontSize: 18,
+    marginBottom: 6,
+  },
+  sectionHeaderH5: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  sectionHeaderH6: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  paragraphContainer: {
+    marginVertical: 8,
+  },
+  paragraphText: {
+    fontSize: 16,
+    color: '#64748B',
+    lineHeight: 24,
+    textAlign: 'left',
+  },
+  spacer: {
+    height: 16,
   },
 });
 

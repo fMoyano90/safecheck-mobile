@@ -46,7 +46,7 @@ export interface ActivityTemplate {
 
 export interface TemplateField {
   id: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'select_choice' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode' | 'referenceImage' | 'info_image';
+  type: 'text' | 'number' | 'email' | 'phone' | 'textarea' | 'select' | 'select_choice' | 'multiselect' | 'radio' | 'checkbox' | 'date' | 'time' | 'datetime' | 'file' | 'photo' | 'signature' | 'location' | 'fileUpload' | 'rating' | 'slider' | 'qrCode' | 'referenceImage' | 'info_image' | 'sectionHeader' | 'paragraph' | 'spacer';
   label: string;
   placeholder?: string;
   required: boolean;
@@ -93,6 +93,12 @@ export interface TemplateField {
     // Para referenceImage
     imageUrl?: string;
     caption?: string;
+    
+    // Para sectionHeader
+    level?: number; // 1-6 para H1-H6
+    
+    // Para paragraph
+    content?: string; // Contenido del párrafo
   };
 }
 
