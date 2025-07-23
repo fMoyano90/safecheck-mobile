@@ -154,8 +154,28 @@ class OfflineApiManager {
 
   // === SISTEMA DE CACHE ===
   private getCacheKey(endpoint: string, method: string, body?: any): string {
-    const bodyHash = body ? btoa(JSON.stringify(body)).slice(0, 8) : '';
+    let bodyHash = '';
+    if (body) {
+      try {
+        // Usar una función más robusta para crear hash que maneje emojis
+        const bodyStr = JSON.stringify(body);
+        bodyHash = this.simpleHash(bodyStr).slice(0, 8);
+      } catch (error) {
+        // Si falla, usar timestamp como fallback
+        bodyHash = Date.now().toString(36).slice(0, 8);
+      }
+    }
     return `${method}_${endpoint}_${bodyHash}`;
+  }
+
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 
   private getFromCache<T>(key: string, timeoutMinutes: number): T | null {
@@ -346,6 +366,8 @@ class OfflineApiManager {
   }
 
   async createDocument(documentData: any): Promise<any> {
+    console.log('📤 createDocument llamado con:', typeof documentData);
+    
     // Guardar documento localmente
     const offlineDoc = {
       id: `offline_${Date.now()}`,
@@ -358,13 +380,22 @@ class OfflineApiManager {
     
     await offlineStorage.saveDocument(offlineDoc);
 
-    return this.request<any>('/api/v1/documents/worker', {
-      method: 'POST',
-      body: JSON.stringify(documentData),
-    }, {
-      priority: 'high',
-      allowOfflineExecution: true,
-    });
+    console.log('📤 Intentando JSON.stringify del documento...');
+    try {
+      const jsonString = JSON.stringify(documentData);
+      console.log('✅ JSON.stringify exitoso, longitud:', jsonString.length);
+      
+      return this.request<any>('/api/v1/documents/worker', {
+        method: 'POST',
+        body: jsonString,
+      }, {
+        priority: 'high',
+        allowOfflineExecution: true,
+      });
+    } catch (error) {
+      console.error('❌ Error en JSON.stringify:', error);
+      throw error;
+    }
   }
 }
 

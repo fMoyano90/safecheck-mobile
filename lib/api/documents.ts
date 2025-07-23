@@ -36,7 +36,23 @@ export interface ActivityTemplate {
   name: string;
   description?: string;
   type: string;
-  structure: TemplateField[];
+  structure: Array<{
+    id: string;
+    type: string;
+    label: string;
+    placeholder?: string;
+    required: boolean;
+    options?: Array<{ label: string; value: string }>;
+    section?: string;
+    validation?: {
+      minLength?: number;
+      maxLength?: number;
+      min?: number;
+      max?: number;
+      pattern?: string;
+      message?: string;
+    };
+  }>;
   category?: {
     id: number;
     name: string;

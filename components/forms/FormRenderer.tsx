@@ -68,19 +68,128 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     requestMediaLibraryPermissionOnly 
   } = usePermissions();
 
+  // Función helper para mantener el orden original de los campos
+  const getOrderedFields = () => {
+    console.log('🔍 Debugging template structure:', {
+      hasTemplate: !!template,
+      hasStructure: !!template?.structure,
+      structureType: typeof template?.structure,
+      isArray: Array.isArray(template?.structure),
+      structureLength: template?.structure?.length
+    });
+    
+    // Verificar si el template tiene la estructura esperada
+    if (!template.structure || !Array.isArray(template.structure)) {
+      console.warn('Template no tiene la estructura esperada:', template);
+      return [];
+    }
+    
+    // Mantener el orden original del array
+    const orderedFields = template.structure.map((field: any) => {
+      // Para campos normales, mantener el tipo original
+      return {
+        ...field,
+        type: field.type // Mantener el tipo original (sectionHeader, paragraph, info_text, text, select_choice, date, etc.)
+      };
+    });
+    
+    console.log('📋 Campos ordenados:', orderedFields.length);
+    console.log('📋 Detalle de campos:', orderedFields.map(f => ({ id: f.id, type: f.type, label: f.label })));
+    return orderedFields;
+  };
+
+  const orderedFields = getOrderedFields();
+  
+  // Si no hay campos, mostrar mensaje de error
+  if (orderedFields.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.formTitle}>{template.name}</Text>
+          <Text style={styles.formDescription}>
+            Error: El formulario no tiene campos configurados correctamente.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  
+  // Filtrar solo los campos de entrada (no elementos de diseño) para paginación
+  const inputFields = orderedFields.filter(field => 
+    field.type !== 'sectionHeader' && 
+    field.type !== 'paragraph' && 
+    field.type !== 'info_text' &&
+    field.type !== 'spacer'
+  );
+  
   // Dividir campos en páginas (6 campos por página para mejor UX)
   const fieldsPerPage = 6;
-  const totalPages = Math.ceil(template.structure.length / fieldsPerPage);
-  const currentFields = template.structure.slice(
+  const totalPages = Math.ceil(inputFields.length / fieldsPerPage);
+  const currentInputFields = inputFields.slice(
     currentPage * fieldsPerPage,
     (currentPage + 1) * fieldsPerPage
   );
+  
+  // Crear un mapa de campos visibles en la página actual
+  const visibleFieldIds = new Set(currentInputFields.map((f: any) => f.id));
+  
+  // Función para determinar qué elementos mostrar en la página actual
+  const getVisibleElementsForPage = () => {
+    const visibleElements: any[] = [];
+    
+    // Para la primera página, mostrar todos los elementos
+    if (currentPage === 0) {
+      return orderedFields;
+    }
+    
+    // Para otras páginas, mostrar solo los campos de entrada en el rango
+    const currentFieldIndices = currentInputFields.map(field => 
+      orderedFields.findIndex(f => f.id === field.id)
+    );
+    
+    if (currentFieldIndices.length === 0) return visibleElements;
+    
+    const minIndex = Math.min(...currentFieldIndices);
+    const maxIndex = Math.max(...currentFieldIndices);
+    
+    // Recorrer todos los campos y agregar solo los que están en el rango de la página actual
+    orderedFields.forEach((field, index) => {
+      // Si está en el rango de la página actual, agregarlo
+      if (index >= minIndex && index <= maxIndex) {
+        visibleElements.push(field);
+      }
+    });
+    
+    console.log('🔍 getVisibleElementsForPage:', {
+      currentPage,
+      minIndex,
+      maxIndex,
+      visibleElementsCount: visibleElements.length,
+      visibleElements: visibleElements.map(f => ({ id: f.id, type: f.type, label: f.label }))
+    });
+    
+    return visibleElements;
+  };
+  
+  const visibleElements = getVisibleElementsForPage();
+  
+  console.log('🔍 Debugging pagination:', {
+    totalFields: orderedFields.length,
+    inputFieldsCount: inputFields.length,
+    currentPage,
+    totalPages,
+    fieldsPerPage,
+    currentInputFieldsCount: currentInputFields.length,
+    visibleFieldIds: Array.from(visibleFieldIds),
+    visibleElementsCount: visibleElements.length,
+    visibleElements: visibleElements.map(f => ({ id: f.id, type: f.type, label: f.label }))
+  });
 
   // Crear esquema de validación dinámico
   const createValidationSchema = () => {
     const schemaFields: any = {};
     
-    template.structure.forEach((field) => {
+    inputFields.forEach((field: any) => {
       let validator: any;
       
       if (field.type === 'email') {
@@ -107,6 +216,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           validator = validator.matches(new RegExp(field.validation.pattern), field.validation.message || 'Formato inválido');
         }
         if (field.required) validator = validator.required(`${field.label} es obligatorio`);
+      } else if (field.type === 'select' || field.type === 'select_choice' || field.type === 'radio') {
+        validator = yup.string();
+        if (field.required) {
+          validator = validator.required(`${field.label} es obligatorio`);
+        }
       } else {
         validator = yup.mixed();
         if (field.required) {
@@ -126,9 +240,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     formState: { errors },
     watch,
     setValue,
+    trigger,
   } = useForm<FormData>({
     resolver: yupResolver(createValidationSchema()),
     defaultValues: initialValues,
+    mode: 'onChange',
   });
 
   // Funciones para manejar campos especiales
@@ -270,11 +386,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     setShowQrScanner(null);
   };
 
-  const renderField = (field: TemplateField) => {
+  const renderField = (field: any) => {
     const hasError = !!errors[field.id];
     
     // Campos especiales que no necesitan label ni contenedor estándar
-    if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer') {
+    if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer' || field.type === 'info_text') {
       return (
         <View key={field.id}>
           <Controller
@@ -310,6 +426,15 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
                 case 'spacer':
                   return <View style={styles.spacer} />;
+
+                case 'info_text':
+                  return (
+                    <View style={styles.infoTextContainer}>
+                      <Text style={styles.infoText}>
+                        {field.label || 'Texto informativo...'}
+                      </Text>
+                    </View>
+                  );
 
                 default:
                   return <View />;
@@ -385,7 +510,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                         !controllerField.value && styles.selectPlaceholderText
                       ]}>
                         {controllerField.value 
-                          ? field.options?.find(opt => opt.value === controllerField.value)?.label 
+                          ? field.options?.find((opt: any) => opt.value === controllerField.value)?.label 
                           : 'Selecciona una opción...'
                         }
                       </Text>
@@ -397,11 +522,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               case 'radio':
                 return (
                   <View style={styles.radioContainer}>
-                    {field.options?.map((option) => (
+                    {field.options?.map((option: any) => (
                       <TouchableOpacity
                         key={option.value}
                         style={styles.radioOption}
-                        onPress={() => controllerField.onChange(option.value)}
+                        onPress={() => {
+                          controllerField.onChange(option.value);
+                          trigger(field.id);
+                        }}
                       >
                         <Ionicons
                           name={controllerField.value === option.value ? "radio-button-on" : "radio-button-off"}
@@ -417,7 +545,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               case 'checkbox':
                 return (
                   <View style={styles.checkboxContainer}>
-                    {field.options?.map((option) => {
+                    {field.options?.map((option: any) => {
                       const isSelected = Array.isArray(controllerField.value) && 
                                        controllerField.value.includes(option.value);
                       return (
@@ -431,6 +559,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                             } else {
                               controllerField.onChange([...currentValues, option.value]);
                             }
+                            trigger(field.id);
                           }}
                         >
                           <Ionicons
@@ -463,11 +592,35 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   return date.toLocaleDateString('es-ES', options);
                 };
                 
+                // Obtener la fecha actual para inicialización
+                const getCurrentDate = () => {
+                  const now = new Date();
+                  // Para campos de fecha, establecer la hora a 00:00:00
+                  if (field.type === 'date') {
+                    now.setHours(0, 0, 0, 0);
+                  }
+                  return now;
+                };
+                
+                // Determinar la fecha a mostrar en el picker
+                const getPickerDate = () => {
+                  if (controllerField.value) {
+                    return new Date(controllerField.value);
+                  }
+                  return getCurrentDate();
+                };
+                
                 return (
                   <View>
                     <TouchableOpacity
                       style={styles.dateButton}
-                      onPress={() => setShowDatePicker({ field: field.id, mode: field.type as any })}
+                      onPress={() => {
+                        // Si no hay valor, establecer la fecha actual antes de abrir el picker
+                        if (!controllerField.value) {
+                          controllerField.onChange(getCurrentDate().toISOString());
+                        }
+                        setShowDatePicker({ field: field.id, mode: field.type as any });
+                      }}
                     >
                       <Text style={styles.dateButtonText}>
                         {controllerField.value 
@@ -494,17 +647,25 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                               </TouchableOpacity>
                             </View>
                             <DateTimePicker
-                              value={controllerField.value ? new Date(controllerField.value) : new Date()}
-                              mode={showDatePicker.mode}
+                              value={getPickerDate()}
+                              mode={showDatePicker?.mode || 'date'}
                               display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
                               locale="es-ES"
                               onChange={(event, selectedDate) => {
+                                // Aplicar la fecha inmediatamente cuando se selecciona
                                 if (selectedDate) {
                                   controllerField.onChange(selectedDate.toISOString());
                                 }
-                                setShowDatePicker(null);
                               }}
                             />
+                            <View style={styles.modalFooter}>
+                              <TouchableOpacity 
+                                style={styles.modalButton}
+                                onPress={() => setShowDatePicker(null)}
+                              >
+                                <Text style={styles.modalButtonText}>Confirmar</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
                       </Modal>
@@ -780,25 +941,219 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   };
 
   const onFormSubmit = (data: FormData) => {
-    // Combinar datos del formulario con archivos adjuntos
-    const finalData = {
-      ...data,
+    // Limpiar los datos para enviar solo valores planos
+    const cleanData: any = {};
+    
+    // Solo incluir campos que tengan valores válidos
+    inputFields.forEach((field: any) => {
+      const value = data[field.id];
+      if (value !== undefined && value !== null && value !== '') {
+        cleanData[field.id] = value;
+      }
+    });
+    
+    // Crear estructura enriquecida para revisiones con toda la estructura del template
+    const enrichedResponses = {
+      sections: [{
+        id: 'main_section',
+        title: template.name || 'Formulario',
+        description: template.description,
+        questions: orderedFields.map((field: any) => {
+          // Para campos de entrada, incluir respuesta
+          if (field.type !== 'section' && field.type !== 'paragraph' && field.type !== 'info_text') {
+            return {
+              id: field.id,
+              text: field.label,
+              type: field.type,
+              required: field.required,
+              placeholder: field.placeholder,
+              options: field.options,
+              content: field.content,
+              answer: {
+                value: data[field.id],
+                timestamp: new Date().toISOString(),
+                metadata: {
+                  location: location[field.id],
+                  photos: photos[field.id] || [],
+                  signature: signatures[field.id],
+                  files: files[field.id] || [],
+                  qrCode: qrCodes[field.id],
+                }
+              }
+            };
+          }
+          
+          // Para títulos de sección
+          if (field.type === 'section') {
+            return {
+              id: field.id,
+              text: field.title,
+              type: 'sectionHeader',
+              required: false,
+              content: field.config?.description,
+              answer: {
+                value: null,
+                timestamp: new Date().toISOString(),
+                metadata: {}
+              }
+            };
+          }
+          
+          // Para párrafos
+          if (field.type === 'paragraph') {
+            return {
+              id: field.id,
+              text: field.content,
+              type: 'paragraph',
+              required: false,
+              content: field.content,
+              answer: {
+                value: null,
+                timestamp: new Date().toISOString(),
+                metadata: {}
+              }
+            };
+          }
+          
+          // Para otros tipos (separadores, etc.)
+          return {
+            id: field.id,
+            text: field.label || field.content || '',
+            type: field.type,
+            required: false,
+            content: field.content,
+            answer: {
+              value: null,
+              timestamp: new Date().toISOString(),
+              metadata: {}
+            }
+          };
+        })
+      }]
+    };
+    
+    // Agregar datos especiales y estructura enriquecida
+    const enrichedData = {
+      ...cleanData,
       _signatures: signatures,
       _photos: photos,
       _locations: location,
+      _files: files,
+      _qrCodes: qrCodes,
+      _enrichedResponses: enrichedResponses, // Estructura enriquecida para revisiones
     };
-    onSubmit(finalData);
+    
+    console.log('📤 Enviando datos con estructura enriquecida:', enrichedData);
+    onSubmit(enrichedData);
   };
 
   const handleSave = () => {
     const currentData = watch();
-    const finalData = {
-      ...currentData,
+    
+    // Limpiar los datos para enviar solo valores planos
+    const cleanData: any = {};
+    
+    // Solo incluir campos que tengan valores válidos
+    inputFields.forEach((field: any) => {
+      const value = currentData[field.id];
+      if (value !== undefined && value !== null && value !== '') {
+        cleanData[field.id] = value;
+      }
+    });
+    
+    // Crear estructura enriquecida para revisiones con toda la estructura del template
+    const enrichedResponses = {
+      sections: [{
+        id: 'main_section',
+        title: template.name || 'Formulario',
+        description: template.description,
+        questions: orderedFields.map((field: any) => {
+          // Para campos de entrada, incluir respuesta
+          if (field.type !== 'section' && field.type !== 'paragraph' && field.type !== 'info_text') {
+            return {
+              id: field.id,
+              text: field.label,
+              type: field.type,
+              required: field.required,
+              placeholder: field.placeholder,
+              options: field.options,
+              content: field.content,
+              answer: {
+                value: currentData[field.id],
+                timestamp: new Date().toISOString(),
+                metadata: {
+                  location: location[field.id],
+                  photos: photos[field.id] || [],
+                  signature: signatures[field.id],
+                  files: files[field.id] || [],
+                  qrCode: qrCodes[field.id],
+                }
+              }
+            };
+          }
+          
+          // Para títulos de sección
+          if (field.type === 'section') {
+            return {
+              id: field.id,
+              text: field.title,
+              type: 'sectionHeader',
+              required: false,
+              content: field.config?.description,
+              answer: {
+                value: null,
+                timestamp: new Date().toISOString(),
+                metadata: {}
+              }
+            };
+          }
+          
+          // Para párrafos
+          if (field.type === 'paragraph') {
+            return {
+              id: field.id,
+              text: field.content,
+              type: 'paragraph',
+              required: false,
+              content: field.content,
+              answer: {
+                value: null,
+                timestamp: new Date().toISOString(),
+                metadata: {}
+              }
+            };
+          }
+          
+          // Para otros tipos (separadores, etc.)
+          return {
+            id: field.id,
+            text: field.label || field.content || '',
+            type: field.type,
+            required: false,
+            content: field.content,
+            answer: {
+              value: null,
+              timestamp: new Date().toISOString(),
+              metadata: {}
+            }
+          };
+        })
+      }]
+    };
+    
+    // Agregar datos especiales y estructura enriquecida
+    const enrichedData = {
+      ...cleanData,
       _signatures: signatures,
       _photos: photos,
       _locations: location,
+      _files: files,
+      _qrCodes: qrCodes,
+      _enrichedResponses: enrichedResponses, // Estructura enriquecida para revisiones
     };
-    onSave?.(finalData);
+    
+    console.log('💾 Guardando datos con estructura enriquecida:', enrichedData);
+    onSave?.(enrichedData);
   };
 
   return (
@@ -831,7 +1186,72 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         style={styles.formContainer} 
         showsVerticalScrollIndicator={false}
       >
-        {currentFields.map(renderField)}
+        {visibleElements.map((field: any) => {
+          console.log('🎯 Rendering field:', {
+            id: field.id,
+            type: field.type,
+            label: field.label
+          });
+          
+          // Renderizar título de sección
+          if (field.type === 'sectionHeader') {
+            const level = field.config?.level || 2;
+            const headerStyle = [
+              styles.sectionHeader,
+              level === 1 && styles.sectionHeaderH1,
+              level === 2 && styles.sectionHeaderH2,
+              level === 3 && styles.sectionHeaderH3,
+              level === 4 && styles.sectionHeaderH4,
+              level === 5 && styles.sectionHeaderH5,
+              level === 6 && styles.sectionHeaderH6,
+            ];
+            return (
+              <View key={field.id} style={styles.sectionHeaderContainer}>
+                <Text style={headerStyle}>
+                  {field.label}
+                </Text>
+              </View>
+            );
+          }
+          
+          // Renderizar párrafo
+          if (field.type === 'paragraph') {
+            return (
+              <View key={field.id} style={styles.paragraphContainer}>
+                <Text style={styles.paragraphText}>
+                  {field.config?.content || field.label || 'Texto del párrafo...'}
+                </Text>
+              </View>
+            );
+          }
+          
+          // Renderizar texto informativo
+          if (field.type === 'info_text') {
+            return (
+              <View key={field.id} style={styles.infoTextContainer}>
+                <Text style={styles.infoText}>
+                  {field.label || 'Texto informativo...'}
+                </Text>
+              </View>
+            );
+          }
+          
+          // Renderizar separador
+          if (field.type === 'spacer') {
+            return <View key={field.id} style={styles.spacer} />;
+          }
+          
+          // Renderizar campo de entrada
+          if (field.type !== 'sectionHeader' && field.type !== 'paragraph' && field.type !== 'info_text' && field.type !== 'spacer') {
+            return (
+              <View key={field.id}>
+                {renderField(field)}
+              </View>
+            );
+          }
+          
+          return null;
+        })}
       </ScrollView>
 
       {/* Botones de navegación */}
@@ -946,7 +1366,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
             </View>
             <ScrollView style={styles.selectModalOptions}>
               {showSelectModal?.options.map((option) => {
-                const currentField = template.structure.find(f => f.id === showSelectModal.fieldId);
+                const currentField = inputFields.find((f: any) => f.id === showSelectModal.fieldId);
                 const currentValue = watch(showSelectModal.fieldId);
                 const isSelected = currentValue === option.value;
                 
@@ -959,6 +1379,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     ]}
                     onPress={() => {
                       setValue(showSelectModal.fieldId, option.value);
+                      trigger(showSelectModal.fieldId);
                       setShowSelectModal(null);
                     }}
                   >
@@ -1676,6 +2097,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginBottom: 10,
   },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  modalButton: {
+    backgroundColor: '#0066cc',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   sectionHeaderH3: {
     fontSize: 20,
     marginBottom: 8,
@@ -1700,6 +2139,17 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 24,
     textAlign: 'left',
+  },
+  infoTextContainer: {
+    marginVertical: 8,
+    paddingHorizontal: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    textAlign: 'left',
+    fontStyle: 'italic',
   },
   spacer: {
     height: 16,
