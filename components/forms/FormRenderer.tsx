@@ -534,7 +534,18 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   <TextInput
                     style={styles.textInput}
                     value={controllerField.value?.toString() || ''}
-                    onChangeText={(text) => controllerField.onChange(parseFloat(text) || text)}
+                    onChangeText={(text) => {
+                      // Solo permitir números, punto decimal y signo negativo
+                      const numericRegex = /^-?\d*\.?\d*$/;
+                      
+                      if (text === '' || numericRegex.test(text)) {
+                        // Si está vacío o es un número válido, actualizar el valor
+                        const numericValue = text === '' ? '' : (isNaN(parseFloat(text)) ? text : parseFloat(text));
+                        controllerField.onChange(numericValue);
+                      }
+                      // Si contiene caracteres no válidos, simplemente no actualizar el campo
+                      // No mostrar alerta para mejor UX - el campo simplemente no acepta la entrada
+                    }}
                     placeholder={field.placeholder}
                     keyboardType="numeric"
                   />
