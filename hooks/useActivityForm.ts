@@ -14,6 +14,7 @@ import {
   useOfflineStatus 
 } from '@/lib/offline';
 import { useDocumentCacheInvalidation } from '@/hooks/useDocumentCache';
+import { AzureUploadService } from '@/services/azure-upload.service';
 
 interface UseActivityFormProps {
   activityId: number;
@@ -209,8 +210,8 @@ export const useActivityForm = ({
     }
   };
 
-  // Función para procesar imágenes y convertir URIs a base64
-  const processImages = async (images: any): Promise<any> => {
+  // Función para procesar imágenes y subirlas directamente a Azure
+  const processImages = async (images: any, onProgress?: (progress: any) => void): Promise<any> => {
     console.log('🖼️ processImages llamado con:', typeof images, images);
     console.log('🖼️ Contenido detallado:', JSON.stringify(images, null, 2));
     
@@ -250,7 +251,8 @@ export const useActivityForm = ({
 
     if (Array.isArray(images)) {
       const processedImages = [];
-      for (const image of images) {
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
         // Validar cada imagen individual
         if (!image || image === '' || image === null || image === undefined) {
           continue; // Saltar imágenes inválidas
@@ -260,14 +262,34 @@ export const useActivityForm = ({
         if (typeof image === 'string') {
           if (image.startsWith('file://') || image.startsWith('content://')) {
             try {
-              const base64Image = await convertUriToBase64(image);
-              processedImages.push(base64Image);
+              console.log(`☁️ Subiendo imagen ${i + 1}/${images.length} a Azure...`);
+              const fileName = `image_${Date.now()}_${i}.jpg`;
+              const azureUrl = await AzureUploadService.uploadImage(
+                image, 
+                fileName,
+                (progress) => {
+                  if (onProgress) {
+                    onProgress({ index: i, progress });
+                  }
+                }
+              );
+              processedImages.push(azureUrl);
+              console.log(`✅ Imagen ${i + 1} subida exitosamente:`, azureUrl);
             } catch (error) {
-              console.warn('No se pudo convertir imagen a base64, manteniendo URI:', image);
-              processedImages.push(image);
+              console.warn('❌ No se pudo subir imagen a Azure, usando fallback a base64:', image, error);
+              try {
+                const base64Image = await convertUriToBase64(image);
+                processedImages.push(base64Image);
+              } catch (base64Error) {
+                console.warn('❌ Fallback a base64 también falló, manteniendo URI:', image);
+                processedImages.push(image);
+              }
             }
           } else if (image.startsWith('data:image')) {
             // Si ya es base64, mantenerlo
+            processedImages.push(image);
+          } else if (image.startsWith('https://')) {
+            // Si ya es una URL de Azure, mantenerla
             processedImages.push(image);
           } else {
             // Si no es un URI de imagen válido, saltarlo
@@ -290,13 +312,29 @@ export const useActivityForm = ({
       // Solo procesar strings que parezcan URIs de imagen
       if (images.startsWith('file://') || images.startsWith('content://')) {
         try {
-          return await convertUriToBase64(images);
+          console.log('☁️ Subiendo imagen individual a Azure...');
+          const fileName = `image_${Date.now()}.jpg`;
+          const azureUrl = await AzureUploadService.uploadImage(
+            images, 
+            fileName,
+            onProgress
+          );
+          console.log('✅ Imagen individual subida exitosamente:', azureUrl);
+          return azureUrl;
         } catch (error) {
-          console.warn('No se pudo convertir imagen a base64, manteniendo URI:', images);
-          return images;
+          console.warn('❌ No se pudo subir imagen a Azure, usando fallback a base64:', images, error);
+          try {
+            return await convertUriToBase64(images);
+          } catch (base64Error) {
+            console.warn('❌ Fallback a base64 también falló, manteniendo URI:', images);
+            return images;
+          }
         }
       } else if (images.startsWith('data:image')) {
         // Si ya es base64, mantenerlo
+        return images;
+      } else if (images.startsWith('https://')) {
+        // Si ya es una URL de Azure, mantenerla
         return images;
       } else {
         // Si no es un URI de imagen válido, retornar null

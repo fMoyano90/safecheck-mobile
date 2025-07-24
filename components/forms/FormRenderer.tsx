@@ -25,6 +25,7 @@ import * as yup from 'yup';
 import SignatureCanvas from 'react-native-signature-canvas';
 import { type TemplateField, type ActivityTemplate } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import { AzureUploadService } from '@/services/azure-upload.service';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -56,6 +57,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [qrCodes, setQrCodes] = useState<{ [key: string]: string }>({});
   const [showQrScanner, setShowQrScanner] = useState<string | null>(null);
   const [showSelectModal, setShowSelectModal] = useState<{ fieldId: string; options: any[] } | null>(null);
+  const [isSigningActive, setIsSigningActive] = useState(false);
   
   const signatureRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -266,10 +268,27 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       });
 
       if (!result.canceled && result.assets[0]) {
-        const currentPhotos = photos[fieldId] || [];
-        const newPhotos = [...currentPhotos, result.assets[0].uri];
-        setPhotos({ ...photos, [fieldId]: newPhotos });
-        setValue(fieldId, newPhotos);
+        const localUri = result.assets[0].uri;
+        
+        try {
+          // Mostrar indicador de carga
+          Alert.alert('Subiendo', 'Subiendo imagen a la nube...');
+          
+          // Subir inmediatamente a Azure
+          const fileName = `photo_${Date.now()}_${fieldId}.jpg`;
+          const azureUrl = await AzureUploadService.uploadImage(localUri, fileName);
+          
+          // Guardar la URL de Azure en lugar de la URI local
+          const currentPhotos = photos[fieldId] || [];
+          const newPhotos = [...currentPhotos, azureUrl];
+          setPhotos({ ...photos, [fieldId]: newPhotos });
+          setValue(fieldId, newPhotos);
+          
+          Alert.alert('Éxito', 'Imagen subida correctamente');
+        } catch (uploadError) {
+          console.error('Error subiendo imagen:', uploadError);
+          Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudo tomar la foto');
@@ -294,10 +313,27 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       });
 
       if (!result.canceled && result.assets[0]) {
-        const currentPhotos = photos[fieldId] || [];
-        const newPhotos = [...currentPhotos, result.assets[0].uri];
-        setPhotos({ ...photos, [fieldId]: newPhotos });
-        setValue(fieldId, newPhotos);
+        const localUri = result.assets[0].uri;
+        
+        try {
+          // Mostrar indicador de carga
+          Alert.alert('Subiendo', 'Subiendo imagen a la nube...');
+          
+          // Subir inmediatamente a Azure
+          const fileName = `photo_${Date.now()}_${fieldId}.jpg`;
+          const azureUrl = await AzureUploadService.uploadImage(localUri, fileName);
+          
+          // Guardar la URL de Azure en lugar de la URI local
+          const currentPhotos = photos[fieldId] || [];
+          const newPhotos = [...currentPhotos, azureUrl];
+          setPhotos({ ...photos, [fieldId]: newPhotos });
+          setValue(fieldId, newPhotos);
+          
+          Alert.alert('Éxito', 'Imagen subida correctamente');
+        } catch (uploadError) {
+          console.error('Error subiendo imagen:', uploadError);
+          Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudo seleccionar la foto');
@@ -332,6 +368,15 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const handleSignature = (fieldId: string, signature: string) => {
     setSignatures({ ...signatures, [fieldId]: signature });
     setValue(fieldId, signature);
+    setIsSigningActive(false); // Desactivar modo firma al confirmar
+  };
+
+  const handleSignatureStart = () => {
+    setIsSigningActive(true); // Activar modo firma al empezar a firmar
+  };
+
+  const handleSignatureClear = () => {
+    setIsSigningActive(false); // Desactivar modo firma al limpiar
   };
 
   const removePhoto = (fieldId: string, index: number) => {
@@ -388,6 +433,16 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   const renderField = (field: any) => {
     const hasError = !!errors[field.id];
+    
+    // Debug: Log del tipo de campo para ubicación GPS
+    if (field.label && field.label.toLowerCase().includes('ubicación')) {
+      console.log('🗺️ Campo de ubicación detectado:', {
+        id: field.id,
+        type: field.type,
+        label: field.label,
+        field: field
+      });
+    }
     
     // Campos especiales que no necesitan label ni contenedor estándar
     if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer' || field.type === 'info_text') {
@@ -737,6 +792,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       <SignatureCanvas
                         ref={signatureRef}
                         onOK={(signature) => handleSignature(field.id, signature)}
+                        onBegin={handleSignatureStart}
+                        onClear={handleSignatureClear}
                         descriptionText="Firme aquí"
                         clearText="Limpiar"
                         confirmText="Confirmar"
@@ -755,7 +812,10 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     <View style={styles.signatureButtons}>
                       <TouchableOpacity
                         style={styles.signatureButton}
-                        onPress={() => signatureRef.current?.clearSignature()}
+                        onPress={() => {
+                          signatureRef.current?.clearSignature();
+                          handleSignatureClear();
+                        }}
                       >
                         <Text style={styles.signatureButtonText}>Limpiar</Text>
                       </TouchableOpacity>
@@ -1185,6 +1245,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         ref={scrollViewRef}
         style={styles.formContainer} 
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isSigningActive}
       >
         {visibleElements.map((field: any) => {
           console.log('🎯 Rendering field:', {

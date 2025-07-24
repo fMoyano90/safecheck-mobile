@@ -347,7 +347,8 @@ export default function ScheduledActivitiesScreen() {
   };
 
   const renderActivityCard = (activity: ScheduledActivity) => {
-    const isCompleted = activity.status === 'approved' || activity.status === 'completed' || activity.status === 'rejected';
+    const isCompleted = activity.status === 'approved' || activity.status === 'completed';
+    const isRejected = activity.status === 'rejected';
     
     return (
       <TouchableOpacity 
@@ -369,7 +370,7 @@ export default function ScheduledActivitiesScreen() {
           <View style={styles.activityContent}>
             <View style={styles.titleContainer}>
               <Text style={[styles.activityTitle, isCompleted && styles.completedText]}>{activity.title}</Text>
-              {isCompleted && (
+              {(isCompleted || isRejected) && (
                 <View style={styles.completedBadge}>
                   <Ionicons 
                     name={activity.status === 'approved' ? 'checkmark-circle' : activity.status === 'rejected' ? 'close-circle' : 'checkmark'} 
