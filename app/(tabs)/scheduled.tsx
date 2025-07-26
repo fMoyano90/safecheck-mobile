@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { activitiesApi, type Activity, documentsApi } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
+import useAuthRedirect from '@/hooks/useAuthRedirect';
 import ActivityDetailsModal from '@/components/activities/ActivityDetailsModal';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
@@ -56,6 +57,12 @@ type ViewMode = 'agenda' | 'calendar';
 
 export default function ScheduledActivitiesScreen() {
   const { user, isLoading } = useAuth();
+  const { shouldShowContent } = useAuthRedirect();
+  
+  // No mostrar contenido si no está autenticado
+  if (!shouldShowContent) {
+    return null;
+  }
   const [viewMode, setViewMode] = useState<ViewMode>('agenda');
   const [activities, setActivities] = useState<ScheduledActivity[]>([]);
   // Usar fecha local para evitar problemas de zona horaria

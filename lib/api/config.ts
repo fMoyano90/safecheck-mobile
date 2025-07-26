@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { handleGlobalAuthError } from './auth-interceptor';
 
 // Configuración base para llamadas a la API
 // Para desarrollo local usar: http://localhost:3030
@@ -151,16 +152,22 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
             console.error('❌ Token refresh failed');
             // Si no se pudo renovar, limpiar tokens
             await tokenManager.clearTokens();
-            throw new ApiError(401, 'Sesión expirada');
+            const authError = new ApiError(401, 'Sesión expirada');
+            handleGlobalAuthError(authError);
+            throw authError;
           }
         } catch (refreshError) {
           console.error('❌ Token refresh error:', refreshError);
           await tokenManager.clearTokens();
-          throw new ApiError(401, 'Sesión expirada');
+          const authError = new ApiError(401, 'Sesión expirada');
+          handleGlobalAuthError(authError);
+          throw authError;
         }
       } else {
         console.error('❌ No refresh token available');
-        throw new ApiError(401, 'No autenticado');
+        const authError = new ApiError(401, 'No autenticado');
+        handleGlobalAuthError(authError);
+        throw authError;
       }
     }
     

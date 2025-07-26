@@ -179,21 +179,7 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Botón de prueba para desarrollo */}
-          <TouchableOpacity
-            style={[
-              styles.testButton,
-              (isLoading || authLoading) && styles.loginButtonDisabled,
-            ]}
-            onPress={() => {
-              setEmail('juan.perez@empresa.com');
-              setPassword('Climadigital1234');
-              setTimeout(() => handleLogin(), 100);
-            }}
-            disabled={isLoading || authLoading}
-          >
-            <Text style={styles.testButtonText}>Login de Prueba (Juan Pérez)</Text>
-          </TouchableOpacity>
+
         </View>
 
         <View style={styles.footer}>
@@ -317,26 +303,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  testButton: {
-    backgroundColor: "#10B981", // green-500
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  testButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+
   footer: {
     paddingHorizontal: 24,
     paddingBottom: 32,

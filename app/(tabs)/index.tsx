@@ -11,6 +11,7 @@ import { Text, View } from "@/components/Themed";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/contexts/auth-context";
+import useAuthRedirect from "@/hooks/useAuthRedirect";
 import {
   activitiesApi,
   type Activity,
@@ -186,6 +187,12 @@ const convertRecurringToLocalActivity = (
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { shouldShowContent } = useAuthRedirect();
+  
+  // No mostrar contenido si no está autenticado
+  if (!shouldShowContent) {
+    return null;
+  }
   const [todayActivities, setTodayActivities] = useState<LocalActivity[]>([]);
   const [completedActivities, setCompletedActivities] = useState<
     LocalActivity[]

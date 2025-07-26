@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
+import useAuthRedirect from '@/hooks/useAuthRedirect';
 import { type DocumentResponse } from '@/lib/api';
 import { FieldRenderer } from '@/components/forms/FieldRenderer';
 import { PdfDownloadButton } from '@/components/PdfDownloadButton';
@@ -22,6 +23,12 @@ type FilterType = 'all' | 'pending' | 'approved' | 'rejected';
 
 export default function HistoryScreen() {
   const { user, isLoading } = useAuth();
+  const { shouldShowContent } = useAuthRedirect();
+  
+  // No mostrar contenido si no está autenticado
+  if (!shouldShowContent) {
+    return null;
+  }
   const {
     documents,
     loading,

@@ -12,17 +12,17 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from '@/components/Themed';
 import { useAuth } from '@/contexts/auth-context';
+import useAuthRedirect from '@/hooks/useAuthRedirect';
 
 export default function ProfileModal() {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
+  const { shouldShowContent } = useAuthRedirect();
 
-  // Usar useEffect para manejar la redirección cuando no hay usuario
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/login');
-    }
-  }, [user, isLoading, router]);
+  // No mostrar contenido si no está autenticado
+  if (!shouldShowContent) {
+    return null;
+  }
 
   const handleLogout = () => {
     Alert.alert(

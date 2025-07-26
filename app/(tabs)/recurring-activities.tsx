@@ -16,6 +16,7 @@ import FormRenderer from '../../components/forms/FormRenderer';
 import useFormTemplates from '../../hooks/useFormTemplates';
 import { recurringActivitiesApi, type RecurringActivity as APIRecurringActivity } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
+import useAuthRedirect from '@/hooks/useAuthRedirect';
 import FormButton from '@/components/activities/FormButton';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { RefreshIndicator } from '../../components/ui/RefreshIndicator';
@@ -38,6 +39,12 @@ interface RecurringActivity {
 export default function RecurringActivitiesScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { shouldShowContent } = useAuthRedirect();
+  
+  // No mostrar contenido si no está autenticado
+  if (!shouldShowContent) {
+    return null;
+  }
   const {
     loading: formLoading,
     error,

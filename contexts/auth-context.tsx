@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authApi, tokenManager, LoginRequest, LoginResponse, UpdateProfileRequest, ChangePasswordRequest } from '@/lib/api';
+import { useRouter } from 'expo-router';
+import { authApi, tokenManager, LoginRequest, LoginResponse, UpdateProfileRequest, ChangePasswordRequest, ApiError } from '@/lib/api';
+import { setGlobalAuthErrorHandler, clearGlobalAuthErrorHandler } from '@/lib/api/auth-interceptor';
 
 interface User {
   id: number;
@@ -28,6 +30,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   changePassword: (data: ChangePasswordRequest) => Promise<void>;
+  handleAuthError: (error: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,10 +43,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
 
   // Verificar si el usuario ya está autenticado al cargar la app
   useEffect(() => {
     checkAuthStatus();
+    
+    // Registrar el handler global de errores de autenticación
+    setGlobalAuthErrorHandler(handleAuthError);
+    
+    // Limpiar el handler cuando el componente se desmonte
+    return () => {
+      clearGlobalAuthErrorHandler();
+    };
   }, []);
 
   const checkAuthStatus = async () => {
@@ -128,7 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Error refreshing profile:', error);
       // Si falla obtener el perfil, probablemente el token expiró
-      await logout();
+      handleAuthError(error);
       throw error;
     }
   };
@@ -153,6 +165,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Función para manejar errores de autenticación
+  const handleAuthError = async (error: any) => {
+    // Verificar si es un error de token expirado o no autorizado
+    if (error instanceof ApiError && (error.status === 401 || error.message.includes('Sesión expirada'))) {
+      console.log('🔄 Token expirado detectado, cerrando sesión y redirigiendo al login');
+      
+      // Limpiar estado de autenticación
+      setUser(null);
+      setIsAuthenticated(false);
+      await tokenManager.clearTokens();
+      
+      // Redirigir al login
+      router.replace('/login');
+    }
+  };
+
   const value: AuthContextType = {
     user,
     isLoading,
@@ -162,6 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshProfile,
     updateProfile,
     changePassword,
+    handleAuthError,
   };
 
   return (
