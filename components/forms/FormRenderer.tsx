@@ -23,14 +23,24 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import SignatureCanvas from 'react-native-signature-canvas';
-import { type TemplateField, type ActivityTemplate } from '@/lib/api';
+import { type ActivityTemplate } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { AzureUploadService } from '@/services/azure-upload.service';
-import { DigitalSignature } from './DigitalSignature';
-import { MultipleSignature } from './MultipleSignature';
 import { authApi } from '@/lib/api/auth';
+import { apiRequest } from '@/lib/api/config';
 
 const { width: screenWidth } = Dimensions.get('window');
+
+// Función para obtener la IP real del cliente
+const getClientIpAddress = async (): Promise<string> => {
+  try {
+    const response = await apiRequest<{ extractedIp: string }>('/digital-signatures/debug/ip-info');
+    return response?.extractedIp || 'N/A';
+  } catch (error) {
+    console.warn('Error obteniendo IP del cliente:', error);
+    return 'N/A';
+  }
+};
 
 interface FormData {
   [key: string]: any;
@@ -1285,7 +1295,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                               location: globalLocation,
                               timestamp: new Date().toISOString(),
                               documentHash: `hash_${template.id}_${Date.now()}`,
-                              ipAddress: 'N/A',
+                              ipAddress: await getClientIpAddress(),
                               userAgent: deviceMetadata?.userAgent
                             }
                           };
