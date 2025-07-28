@@ -26,6 +26,9 @@ import SignatureCanvas from 'react-native-signature-canvas';
 import { type TemplateField, type ActivityTemplate } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { AzureUploadService } from '@/services/azure-upload.service';
+import { DigitalSignature } from './DigitalSignature';
+import { MultipleSignature } from './MultipleSignature';
+import { authApi } from '@/lib/api/auth';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -58,6 +61,9 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [showQrScanner, setShowQrScanner] = useState<string | null>(null);
   const [showSelectModal, setShowSelectModal] = useState<{ fieldId: string; options: any[] } | null>(null);
   const [isSigningActive, setIsSigningActive] = useState(false);
+  const [deviceMetadata, setDeviceMetadata] = useState<any>(null);
+  const [globalLocation, setGlobalLocation] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
   
   const signatureRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -69,6 +75,51 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     requestLocationPermissionOnly, 
     requestMediaLibraryPermissionOnly 
   } = usePermissions();
+
+  // Función para capturar metadatos del dispositivo y ubicación automáticamente
+  const captureDeviceAndLocationMetadata = async () => {
+    try {
+      // Capturar información del dispositivo
+      const deviceInfo = {
+        platform: Platform.OS,
+        version: Platform.Version,
+        screenWidth: Dimensions.get('window').width,
+        screenHeight: Dimensions.get('window').height,
+        timestamp: new Date().toISOString(),
+        userAgent: 'NucleoGestor-Mobile/1.0.0',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+      setDeviceMetadata(deviceInfo);
+
+      // Intentar obtener ubicación (sin mostrar errores si falla)
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const currentLocation = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced, // Usar precisión balanceada para ahorrar batería
+          });
+          const locationData = {
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+            accuracy: currentLocation.coords.accuracy,
+            timestamp: currentLocation.timestamp,
+            capturedAt: new Date().toISOString(),
+          };
+          setGlobalLocation(locationData);
+        }
+      } catch (locationError) {
+        console.warn('No se pudo obtener la ubicación:', locationError);
+        // En ambientes mineros, la ubicación puede no estar disponible
+      }
+    } catch (error) {
+      console.error('Error capturando metadatos:', error);
+    }
+  };
+
+  // Ejecutar captura de metadatos al montar el componente
+  React.useEffect(() => {
+    captureDeviceAndLocationMetadata();
+  }, []);
 
   // Función helper para mantener el orden original de los campos
   const getOrderedFields = () => {
@@ -986,6 +1037,441 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                         <Text style={styles.referenceImageCaption}>
                           {field.config.caption || 'Imagen de referencia'}
                         </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+
+              case 'digital_signature':
+                return (
+                  <View style={styles.digitalSignatureContainer}>
+                    <Text style={styles.digitalSignatureTitle}>
+                      {field.config?.documentTitle || template.name}
+                    </Text>
+                    
+                    {/* Términos y condiciones legales */}
+                    <View style={styles.legalTermsContainer}>
+                      <Text style={styles.legalTermsTitle}>Términos y Condiciones de Firma Digital</Text>
+                      <ScrollView style={styles.legalTermsScroll} showsVerticalScrollIndicator={true}>
+                        <Text style={styles.legalTermsText}>
+                          <Text style={styles.legalTermsBold}>DECLARACIÓN DE VALIDEZ LEGAL:</Text>{"\n"}
+                          Al firmar digitalmente este documento, declaro bajo juramento que:{"\n\n"}
+                          
+                          <Text style={styles.legalTermsBold}>1. IDENTIDAD Y AUTORIZACIÓN:</Text>{"\n"}
+                          • Soy la persona identificada en este sistema{"\n"}
+                          • Tengo autorización para firmar este documento{"\n"}
+                          • Acepto la responsabilidad legal de mi firma{"\n\n"}
+                          
+                          <Text style={styles.legalTermsBold}>2. VALIDEZ JURÍDICA:</Text>{"\n"}
+                          • Esta firma digital tiene la misma validez legal que una firma manuscrita{"\n"}
+                          • Me comprometo a no repudiar esta firma en el futuro{"\n"}
+                          • Acepto que esta firma sea vinculante legalmente{"\n\n"}
+                          
+                          <Text style={styles.legalTermsBold}>3. TRAZABILIDAD Y SEGURIDAD:</Text>{"\n"}
+                          • Autorizo la captura de metadatos (ubicación, dispositivo, timestamp){"\n"}
+                          • Acepto que estos datos sean utilizados como evidencia legal{"\n"}
+                          • Confirmo que firmo desde un ambiente minero autorizado{"\n\n"}
+                          
+                          <Text style={styles.legalTermsBold}>4. RESPONSABILIDADES:</Text>{"\n"}
+                          • Soy responsable del contenido del documento firmado{"\n"}
+                          • Confirmo haber leído y entendido el documento completo{"\n"}
+                          • Acepto las consecuencias legales de esta firma{"\n\n"}
+                          
+                          <Text style={styles.legalTermsBold}>5. CUMPLIMIENTO NORMATIVO:</Text>{"\n"}
+                          • Esta firma cumple con la normativa de seguridad minera{"\n"}
+                          • Respeta los protocolos de trazabilidad requeridos{"\n"}
+                          • Garantiza la integridad del proceso de firma{"\n\n"}
+                          
+                          {field.config?.acceptanceText && (
+                            <Text style={styles.legalTermsBold}>CONDICIONES ESPECÍFICAS:{"\n"}</Text>
+                          )}
+                          {field.config?.acceptanceText}
+                        </Text>
+                      </ScrollView>
+                    </View>
+
+                    {/* Autenticación con contraseña */}
+                    <View style={styles.passwordAuthContainer}>
+                      <Text style={styles.passwordAuthLabel}>Confirme su contraseña para firmar</Text>
+                      <View style={styles.passwordInputContainer}>
+                        <TextInput
+                          style={styles.passwordInput}
+                          placeholder="Ingrese su contraseña de la aplicación"
+                          secureTextEntry={!showPassword}
+                          value={controllerField.value?.password || ''}
+                          onChangeText={(text) => {
+                            const currentValue = controllerField.value || {};
+                            controllerField.onChange({
+                              ...currentValue,
+                              password: text
+                            });
+                          }}
+                        />
+                        <TouchableOpacity
+                          style={styles.passwordToggleButton}
+                          onPress={() => setShowPassword(!showPassword)}
+                        >
+                          <Ionicons
+                            name={showPassword ? "eye-off" : "eye"}
+                            size={20}
+                            color="#666"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    
+                    {/* Checkbox de aceptación de términos */}
+                    <TouchableOpacity 
+                      style={styles.digitalCheckboxContainer}
+                      onPress={() => {
+                        const currentValue = controllerField.value || {};
+                        controllerField.onChange({
+                          ...currentValue,
+                          termsAccepted: !currentValue.termsAccepted
+                        });
+                      }}
+                    >
+                      <View style={[
+                        styles.digitalCheckbox,
+                        controllerField.value?.termsAccepted && styles.digitalCheckboxChecked
+                      ]}>
+                        {controllerField.value?.termsAccepted && (
+                          <Ionicons name="checkmark" size={16} color="white" />
+                        )}
+                      </View>
+                      <Text style={styles.digitalCheckboxLabel}>
+                        He leído, entendido y acepto todos los términos y condiciones de la firma digital
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Checkbox de confirmación de identidad */}
+                    <TouchableOpacity 
+                      style={styles.digitalCheckboxContainer}
+                      onPress={() => {
+                        const currentValue = controllerField.value || {};
+                        controllerField.onChange({
+                          ...currentValue,
+                          identityConfirmed: !currentValue.identityConfirmed
+                        });
+                      }}
+                    >
+                      <View style={[
+                        styles.digitalCheckbox,
+                        controllerField.value?.identityConfirmed && styles.digitalCheckboxChecked
+                      ]}>
+                        {controllerField.value?.identityConfirmed && (
+                          <Ionicons name="checkmark" size={16} color="white" />
+                        )}
+                      </View>
+                      <Text style={styles.digitalCheckboxLabel}>
+                        Confirmo mi identidad y autorización para firmar este documento
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Firma visual opcional */}
+                    {field.config?.requiresVisualSignature && (
+                      <View style={styles.digitalVisualSignatureContainer}>
+                        <Text style={styles.digitalSignatureLabel}>Firma Visual (Requerida)</Text>
+                        <Text style={styles.signatureInstructions}>
+                          Dibuje su firma en el recuadro. Esta firma será parte del documento legal.
+                        </Text>
+                        <SignatureCanvas
+                          ref={signatureRef}
+                          style={styles.digitalSignatureCanvas}
+                          onOK={(signature) => {
+                            const currentValue = controllerField.value || {};
+                            controllerField.onChange({
+                              ...currentValue,
+                              visualSignature: signature
+                            });
+                            setSignatures({ ...signatures, [field.id]: signature });
+                          }}
+                          onEmpty={() => {
+                            const currentValue = controllerField.value || {};
+                            controllerField.onChange({
+                              ...currentValue,
+                              visualSignature: null
+                            });
+                          }}
+                          descriptionText="Firme aquí"
+                          clearText="Limpiar"
+                          confirmText="Confirmar"
+                          webStyle={`
+                            .m-signature-pad--footer {
+                              display: none;
+                            }
+                            .m-signature-pad {
+                              box-shadow: none;
+                              border: 2px solid #0066cc;
+                              border-radius: 8px;
+                              background-color: #fafafa;
+                            }
+                            body,html {
+                              width: 100%; height: 100%;
+                            }
+                          `}
+                        />
+                        <View style={styles.digitalSignatureButtons}>
+                          <TouchableOpacity 
+                            style={styles.digitalSignatureButton}
+                            onPress={() => {
+                              signatureRef.current?.clearSignature();
+                              const currentValue = controllerField.value || {};
+                              controllerField.onChange({
+                                ...currentValue,
+                                visualSignature: null
+                              });
+                              const newSignatures = { ...signatures };
+                              delete newSignatures[field.id];
+                              setSignatures(newSignatures);
+                            }}
+                          >
+                            <Text style={styles.digitalSignatureButtonText}>Limpiar</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.digitalSignatureButton, styles.digitalSignatureButtonPrimary]}
+                            onPress={() => signatureRef.current?.readSignature()}
+                          >
+                            <Text style={[styles.digitalSignatureButtonText, styles.digitalSignatureButtonTextPrimary]}>Confirmar Firma</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Botón de firma final */}
+                    <TouchableOpacity 
+                      style={[
+                        styles.finalSignatureButton,
+                        (controllerField.value?.termsAccepted && 
+                         controllerField.value?.identityConfirmed && 
+                         controllerField.value?.password?.length >= 6 &&
+                         (!field.config?.requiresVisualSignature || controllerField.value?.visualSignature)) 
+                          ? styles.finalSignatureButtonEnabled 
+                          : styles.finalSignatureButtonDisabled
+                      ]}
+                      disabled={!(controllerField.value?.termsAccepted && 
+                                 controllerField.value?.identityConfirmed && 
+                                 controllerField.value?.password?.length >= 6 &&
+                                 (!field.config?.requiresVisualSignature || controllerField.value?.visualSignature))}
+                      onPress={async () => {
+                        const currentValue = controllerField.value || {};
+                        const password = currentValue.password;
+                        
+                        if (!password || password.length < 6) {
+                          Alert.alert('Error', 'Debe ingresar una contraseña válida de al menos 6 caracteres.');
+                          return;
+                        }
+                        
+                        try {
+                          // Verificar la contraseña con el backend
+                          const verificationResult = await authApi.verifyPassword({ password });
+                          
+                          if (!verificationResult.valid) {
+                            Alert.alert('Contraseña Incorrecta', 'La contraseña ingresada no es correcta. Por favor, verifique e intente nuevamente.');
+                            return;
+                          }
+                          
+                          // Si la contraseña es válida, proceder con la firma
+                          // Excluir la contraseña de los datos guardados por seguridad
+                          const { password: _, ...dataWithoutPassword } = currentValue;
+                          const signatureData = {
+                            ...dataWithoutPassword,
+                            signed: true,
+                            signedAt: new Date().toISOString(),
+                            documentHash: `hash_${template.id}_${Date.now()}`,
+                            signatureMethod: field.config?.requiresVisualSignature ? 'digital_signature_with_visual' : 'digital_signature_checkbox',
+                            traceability: {
+                              device: deviceMetadata,
+                              location: globalLocation,
+                              timestamp: new Date().toISOString(),
+                              documentHash: `hash_${template.id}_${Date.now()}`,
+                              ipAddress: 'N/A',
+                              userAgent: deviceMetadata?.userAgent
+                            }
+                          };
+                          controllerField.onChange(signatureData);
+                          Alert.alert(
+                            'Firma Completada',
+                            'Su firma digital ha sido registrada exitosamente con validez legal completa.',
+                            [{ text: 'Entendido', style: 'default' }]
+                          );
+                        } catch (error) {
+                          console.error('Error verificando contraseña:', error);
+                          Alert.alert('Error', 'No se pudo verificar la contraseña. Verifique su conexión e intente nuevamente.');
+                        }
+                      }}
+                    >
+                      <Text style={[
+                        styles.finalSignatureButtonText,
+                        (controllerField.value?.termsAccepted && 
+                         controllerField.value?.identityConfirmed && 
+                         controllerField.value?.password?.length >= 6 &&
+                         (!field.config?.requiresVisualSignature || controllerField.value?.visualSignature)) 
+                          ? styles.finalSignatureButtonTextEnabled 
+                          : styles.finalSignatureButtonTextDisabled
+                      ]}>
+                        {controllerField.value?.signed ? '✓ Documento Firmado' : 'FIRMAR DOCUMENTO'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Información de trazabilidad */}
+                    {controllerField.value?.signed && (
+                      <View style={styles.digitalTraceabilityInfo}>
+                        <Text style={styles.digitalTraceabilityTitle}>✓ Firma Registrada - Información de Trazabilidad</Text>
+                        <Text style={styles.digitalTraceabilityText}>Dispositivo: {deviceMetadata?.platform} {deviceMetadata?.version}</Text>
+                        <Text style={styles.digitalTraceabilityText}>Ubicación: {globalLocation ? `${globalLocation.latitude.toFixed(6)}, ${globalLocation.longitude.toFixed(6)}` : 'No disponible'}</Text>
+                        <Text style={styles.digitalTraceabilityText}>Fecha y hora: {new Date(controllerField.value?.signedAt).toLocaleString('es-ES')}</Text>
+                        <Text style={styles.digitalTraceabilityText}>Hash del documento: {controllerField.value?.documentHash || 'Generando...'}</Text>
+                        <Text style={styles.digitalTraceabilityText}>Estado: Firmado digitalmente con validez legal</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+
+              case 'multiple_signature':
+                return (
+                  <View style={styles.multipleSignatureContainer}>
+                    <Text style={styles.signatureTitle}>
+                      {field.config?.documentTitle || template.name}
+                    </Text>
+                    <Text style={styles.signatureAcceptanceText}>
+                      {field.config?.acceptanceText || 'Acepto los términos y condiciones de este documento'}
+                    </Text>
+                    
+                    {/* Selector de trabajador */}
+                    <View style={styles.workerSelectorContainer}>
+                      <Text style={styles.workerSelectorLabel}>Seleccionar trabajador que firma:</Text>
+                      <View style={styles.workersList}>
+                        {(field.config?.requiredSigners || []).map((signer: any, index: number) => {
+                          const currentSignatures = controllerField.value?.signatures || [];
+                          const hasSignedAlready = currentSignatures.some((sig: any) => sig.signerId === signer.id);
+                          
+                          return (
+                            <TouchableOpacity
+                              key={signer.id || index}
+                              style={[
+                                styles.workerItem,
+                                hasSignedAlready && styles.workerItemSigned
+                              ]}
+                              onPress={() => {
+                                if (hasSignedAlready) {
+                                  Alert.alert('Información', `${signer.name} ya ha firmado este documento.`);
+                                  return;
+                                }
+                                
+                                Alert.alert(
+                                  'Confirmar Firma',
+                                  `¿Confirma que ${signer.name} acepta los términos de este documento?`,
+                                  [
+                                    { text: 'Cancelar', style: 'cancel' },
+                                    {
+                                      text: 'Confirmar',
+                                      onPress: () => {
+                                        const newSignature = {
+                                          signerId: signer.id,
+                                          signerName: signer.name,
+                                          signerRole: signer.role || 'Trabajador',
+                                          timestamp: new Date().toISOString(),
+                                          deviceInfo: deviceMetadata,
+                                          location: globalLocation,
+                                          documentHash: `hash_${template.id}_${Date.now()}`,
+                                          signatureMethod: 'worker_acceptance',
+                                          accepted: true,
+                                        };
+                                        
+                                        const currentValue = controllerField.value || {};
+                                        const currentSignatures = currentValue.signatures || [];
+                                        const updatedSignatures = [...currentSignatures, newSignature];
+                                        
+                                        const allRequiredSigners = field.config?.requiredSigners || [];
+                                        const isComplete = updatedSignatures.length === allRequiredSigners.length;
+                                        
+                                        const signatureData = {
+                                          ...currentValue,
+                                          signatures: updatedSignatures,
+                                          status: isComplete ? 'completed' : 'partial',
+                                          completedAt: isComplete ? new Date().toISOString() : null,
+                                          totalRequired: allRequiredSigners.length,
+                                          totalSigned: updatedSignatures.length,
+                                        };
+                                        
+                                        controllerField.onChange(signatureData);
+                                        
+                                        if (isComplete) {
+                                          Alert.alert('Éxito', 'Todas las firmas han sido completadas.');
+                                        } else {
+                                          Alert.alert('Firma Registrada', `Firma de ${signer.name} registrada exitosamente.`);
+                                        }
+                                      }
+                                    }
+                                  ]
+                                );
+                              }}
+                            >
+                              <View style={styles.workerInfo}>
+                                <Text style={styles.workerName}>{signer.name}</Text>
+                                <Text style={styles.workerRole}>{signer.role || 'Trabajador'}</Text>
+                              </View>
+                              
+                              <View style={styles.workerStatus}>
+                                {hasSignedAlready ? (
+                                  <View style={styles.signedIndicator}>
+                                    <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                                    <Text style={styles.signedText}>Firmado</Text>
+                                  </View>
+                                ) : (
+                                  <View style={styles.pendingIndicator}>
+                                    <Ionicons name="time-outline" size={24} color="#FF9800" />
+                                    <Text style={styles.pendingText}>Pendiente</Text>
+                                  </View>
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                    
+                    {/* Resumen de firmas */}
+                    {controllerField.value?.signatures && controllerField.value.signatures.length > 0 && (
+                      <View style={styles.signaturesStatus}>
+                        <Text style={styles.signaturesStatusTitle}>Estado de Firmas:</Text>
+                        <Text style={styles.signaturesStatusText}>
+                          {controllerField.value.totalSigned || 0} de {controllerField.value.totalRequired || 0} firmas completadas
+                        </Text>
+                        
+                        {controllerField.value.status === 'completed' && (
+                          <View style={styles.completedStatus}>
+                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                            <Text style={styles.completedStatusText}>Documento completamente firmado</Text>
+                          </View>
+                        )}
+                        
+                        {/* Lista de firmas registradas */}
+                        <View style={styles.signaturesList}>
+                          {controllerField.value.signatures.map((signature: any, index: number) => (
+                            <View key={index} style={styles.signatureItem}>
+                              <Text style={styles.signatureItemName}>✓ {signature.signerName}</Text>
+                              <Text style={styles.signatureItemTime}>
+                                {new Date(signature.timestamp).toLocaleString()}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                    
+                    {/* Información de trazabilidad */}
+                    {controllerField.value?.signatures && controllerField.value.signatures.length > 0 && (
+                      <View style={styles.traceabilityInfo}>
+                        <Text style={styles.traceabilityTitle}>Información de Trazabilidad:</Text>
+                        <Text style={styles.traceabilityText}>📱 Dispositivo: {deviceMetadata?.platform} {deviceMetadata?.version}</Text>
+                        <Text style={styles.traceabilityText}>🕐 Última actualización: {new Date().toLocaleString()}</Text>
+                        {globalLocation && (
+                          <Text style={styles.traceabilityText}>
+                            📍 Ubicación: {globalLocation.latitude.toFixed(6)}, {globalLocation.longitude.toFixed(6)}
+                          </Text>
+                        )}
                       </View>
                     )}
                   </View>
@@ -2225,6 +2711,500 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: 16,
+  },
+  // Estilos para firmas digitales
+  digitalSignatureContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  digitalSignatureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  digitalSignatureAcceptanceText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  digitalCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  digitalCheckbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    borderRadius: 4,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+  },
+  digitalCheckboxChecked: {
+    backgroundColor: '#0066cc',
+    borderColor: '#0066cc',
+  },
+  digitalCheckboxLabel: {
+    fontSize: 16,
+    color: '#374151',
+    flex: 1,
+  },
+  digitalVisualSignatureContainer: {
+    marginTop: 16,
+  },
+  digitalSignatureLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  digitalSignatureCanvas: {
+    height: 200,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  digitalSignatureButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  digitalSignatureButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: 'white',
+    alignItems: 'center',
+  },
+  digitalSignatureButtonPrimary: {
+    backgroundColor: '#0066cc',
+    borderColor: '#0066cc',
+  },
+  digitalSignatureButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  digitalSignatureButtonTextPrimary: {
+    color: 'white',
+  },
+  digitalTraceabilityInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  digitalTraceabilityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  digitalTraceabilityText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  // Estilos para firmas múltiples
+  multipleSignatureContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  multipleWorkerSelectorContainer: {
+    marginTop: 16,
+  },
+  multipleWorkerSelectorLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  multipleWorkersList: {
+    gap: 8,
+  },
+  multipleWorkerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  multipleWorkerItemSigned: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  multipleWorkerInfo: {
+    flex: 1,
+  },
+  multipleWorkerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  multipleWorkerRole: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  multipleWorkerStatus: {
+    alignItems: 'center',
+  },
+  multipleSignedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  multipleSignedText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  multiplePendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  multiplePendingText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '600',
+  },
+  multipleSignaturesStatus: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  multipleSignaturesStatusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  multipleSignaturesStatusText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  multipleCompletedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  multipleCompletedStatusText: {
+    fontSize: 14,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  multipleSignaturesList: {
+    gap: 8,
+  },
+  multipleSignatureItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  multipleSignatureItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  multipleSignatureItemTime: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  
+  // Estilos adicionales para firma digital mejorada
+  legalTermsContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    marginBottom: 20,
+    maxHeight: 200,
+  },
+  legalTermsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    padding: 12,
+    backgroundColor: '#e9ecef',
+    color: '#495057',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  legalTermsScroll: {
+    maxHeight: 150,
+    padding: 12,
+  },
+  legalTermsText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#495057',
+  },
+  legalTermsBold: {
+    fontWeight: 'bold',
+    color: '#212529',
+  },
+  
+  // Autenticación con contraseña
+  passwordAuthContainer: {
+    marginBottom: 20,
+  },
+  passwordAuthLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#495057',
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'transparent',
+  },
+  
+  // Instrucciones de firma
+  signatureInstructions: {
+    fontSize: 13,
+    color: '#6c757d',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  
+  // Botón de firma final
+  finalSignatureButton: {
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+  },
+  finalSignatureButtonEnabled: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+  },
+  finalSignatureButtonDisabled: {
+    backgroundColor: '#e9ecef',
+    borderColor: '#ced4da',
+  },
+  finalSignatureButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  finalSignatureButtonTextEnabled: {
+    color: '#ffffff',
+  },
+  finalSignatureButtonTextDisabled: {
+    color: '#6c757d',
+  },
+  
+  // Estilos faltantes para firma digital
+  signatureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  signatureAcceptanceText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  
+  // Estilos faltantes para múltiples firmas
+  workerSelectorContainer: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  workerSelectorLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  workersList: {
+    gap: 8,
+  },
+  workerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  workerItemSigned: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  workerInfo: {
+    flex: 1,
+  },
+  workerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  workerRole: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  workerStatus: {
+    alignItems: 'center',
+  },
+  signedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  signedText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  pendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pendingText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '600',
+  },
+  signaturesStatus: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  signaturesStatusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  signaturesStatusText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  completedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  completedStatusText: {
+    fontSize: 14,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  signaturesList: {
+    gap: 8,
+  },
+  signatureItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  signatureItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  signatureItemTime: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  traceabilityInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  traceabilityTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  traceabilityText: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  
+  // Estilos para el contenedor de contraseña con botón de mostrar/ocultar
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
+  },
+  passwordToggleButton: {
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

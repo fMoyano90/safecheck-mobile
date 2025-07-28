@@ -47,6 +47,15 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface VerifyPasswordRequest {
+  password: string;
+}
+
+export interface VerifyPasswordResponse {
+  valid: boolean;
+  message: string;
+}
+
 // API functions para autenticación
 export const authApi = {
   // Iniciar sesión
@@ -60,6 +69,14 @@ export const authApi = {
   // Refrescar token
   refreshToken: async (data: RefreshTokenRequest): Promise<LoginResponse> => {
     return apiRequest<LoginResponse>('/api/v1/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Verificar contraseña para firma digital
+  verifyPassword: async (data: VerifyPasswordRequest): Promise<VerifyPasswordResponse> => {
+    return apiRequest<VerifyPasswordResponse>('/api/v1/auth/verify-password', {
       method: 'POST',
       body: JSON.stringify(data),
     });
