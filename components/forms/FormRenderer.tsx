@@ -34,8 +34,10 @@ const { width: screenWidth } = Dimensions.get('window');
 // Función para obtener la IP real del cliente
 const getClientIpAddress = async (): Promise<string> => {
   try {
-    const response = await apiRequest<{ extractedIp: string }>('/digital-signatures/debug/ip-info');
-    return response?.extractedIp || 'N/A';
+    const response = await apiRequest<{requestInfo: {
+      ip: string
+    }}>('/digital-signatures/debug/ip-info');
+    return response?.requestInfo?.ip || 'N/A';
   } catch (error) {
     console.warn('Error obteniendo IP del cliente:', error);
     return 'N/A';
