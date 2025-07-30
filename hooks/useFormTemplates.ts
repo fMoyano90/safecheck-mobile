@@ -62,9 +62,25 @@ export const useFormTemplates = () => {
   const [error, setError] = useState<string | null>(null);
 
   const getAuthToken = async (): Promise<string | null> => {
-    // TODO: Implementar lógica de autenticación
-    // Esto debería obtener el token desde AsyncStorage o similar
-    return 'your-auth-token';
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const token = await AsyncStorage.getItem('auth_token');
+      return token;
+    } catch (error) {
+      console.error('Error obteniendo token:', error);
+      return null;
+    }
+  };
+
+  const getCurrentUser = async (): Promise<any> => {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const userStr = await AsyncStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (error) {
+      console.error('Error obteniendo usuario:', error);
+      return null;
+    }
   };
 
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
@@ -139,15 +155,17 @@ export const useFormTemplates = () => {
     }
   };
 
-  const submitForm = async (submission: FormSubmission): Promise<void> => {
+  const submitForm = async (submission: FormSubmission): Promise<any> => {
     setLoading(true);
     setError(null);
     
     try {
-      await apiRequest('/form-submissions', {
+      // Usar el endpoint correcto que ya funcionaba
+      const result = await apiRequest('/documents/worker', {
         method: 'POST',
         body: JSON.stringify(submission),
       });
+      return result; // Devolver el resultado que debería incluir el ID del documento creado
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al enviar el formulario';
       setError(errorMessage);

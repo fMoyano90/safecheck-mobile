@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,21 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { AzureUploadService } from '@/services/azure-upload.service';
 import { authApi } from '@/lib/api/auth';
 import { apiRequest } from '@/lib/api/config';
+import { UserSelector } from './UserSelector';
+import { PendingSignatures } from './PendingSignatures';
+import { User, signaturesApi, notificationsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+
+interface SignatureRecord {
+  user: User;
+  status: 'pending' | 'signed' | 'current';
+  signedAt?: Date;
+  signature?: string;
+  signatureMethod?: 'digital' | 'local' | 'remote';
+  ipAddress?: string;
+  deviceInfo?: any;
+  locationInfo?: any;
+}
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -44,6 +59,35 @@ const getClientIpAddress = async (): Promise<string> => {
   }
 };
 
+// Función para actualizar firmas con documentId después de crear el documento
+export const updateSignaturesWithDocumentId = async (signatureIds: number[], documentId: number) => {
+  
+  if (!signatureIds || signatureIds.length === 0) {
+    console.log('❌ No hay IDs de firmas para actualizar');
+    return;
+  }
+  
+  if (!documentId || documentId <= 0) {
+    console.error('❌ documentId inválido:', documentId);
+    throw new Error('Document ID debe ser un número positivo válido');
+  }
+  
+  try {
+    const requestData = {
+      signatureIds,
+      documentId
+    };
+    
+    const result = await signaturesApi.updateSignaturesWithDocumentId(requestData);
+
+    return result;
+    
+  } catch (error: any) {
+    console.error('❌ Error actualizando firmas con documentId:', error);
+    throw error;
+  }
+};
+
 interface FormData {
   [key: string]: any;
 }
@@ -54,6 +98,7 @@ interface FormRendererProps {
   onSave?: (data: FormData) => void;
   initialValues?: FormData;
   isLoading?: boolean;
+  // onCreateSignatures eliminado: los formularios simples no deben crear firmas
 }
 
 const FormRenderer: React.FC<FormRendererProps> = ({
@@ -62,6 +107,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onSave,
   initialValues = {},
   isLoading = false,
+  // onCreateSignatures eliminado
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [showDatePicker, setShowDatePicker] = useState<{ field: string; mode: 'date' | 'time' | 'datetime' } | null>(null);
@@ -76,6 +122,17 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const [deviceMetadata, setDeviceMetadata] = useState<any>(null);
   const [globalLocation, setGlobalLocation] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [signatureRecords, setSignatureRecords] = useState<SignatureRecord[]>([]);
+  const [showUserSelector, setShowUserSelector] = useState(false);
+  const [showPendingSignatures, setShowPendingSignatures] = useState(false);
+  
+  // Estados derivados para mejor organización
+  const pendingSignatures = signatureRecords.filter(record => record.status === 'pending');
+  const completedSignatures = signatureRecords.filter(record => record.status === 'signed');
+  const allSignatures = signatureRecords;
+  // Para mostrar en el modal, incluir todas las firmas (pendientes y completadas)
+  const allSignaturesForDisplay = signatureRecords;
   
   const signatureRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -88,7 +145,130 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     requestMediaLibraryPermissionOnly 
   } = usePermissions();
 
-  // Función para capturar metadatos del dispositivo y ubicación automáticamente
+  // Hook para obtener el usuario actual
+  const { user } = useAuth();
+
+  // Efecto para agregar automáticamente al usuario actual como firmante por defecto
+  useEffect(() => {
+    if (user) {
+      // Verificar si el usuario actual ya está en la lista de firmantes
+      const isCurrentUserIncluded = signatureRecords.some(record => record.user.id === user.id);
+      
+      if (!isCurrentUserIncluded) {
+        const currentUserRecord: SignatureRecord = {
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role as 'admin' | 'supervisor' | 'worker',
+            isActive: true,
+          },
+          status: 'pending',
+          signatureMethod: 'digital',
+          ipAddress: undefined,
+          deviceInfo: deviceMetadata,
+          locationInfo: globalLocation,
+        };
+        
+        const currentUser = {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role as 'admin' | 'supervisor' | 'worker',
+          isActive: true,
+        };
+        
+        setSignatureRecords(prev => [currentUserRecord, ...prev]);
+        setSelectedUsers(prev => [currentUser, ...prev]);
+      }
+    }
+  }, [user, deviceMetadata, globalLocation, signatureRecords]);
+
+  // Funciones para manejar firmas múltiples
+  const handleUserSelection = useCallback((users: User[]) => {
+    try {
+      // Filtrar usuarios que no estén ya en la lista
+      const currentUserIds = signatureRecords.map(sig => sig.user.id);
+      const newUsers = users.filter(user => !currentUserIds.includes(user.id));
+      
+      if (newUsers.length === 0) {
+        Alert.alert(
+          'Información', 
+          'Los usuarios seleccionados ya están en la lista de firmas.',
+          [{ text: 'OK' }]
+        );
+        setTimeout(() => {
+          setShowUserSelector(false);
+        }, 10);
+        return;
+      }
+      
+      // Crear nuevos registros de firma pendientes para los usuarios nuevos
+      const newSignatureRecords = newUsers.map(user => ({
+        user,
+        status: 'pending' as const,
+        signatureMethod: 'digital' as const,
+        ipAddress: undefined,
+        deviceInfo: deviceMetadata,
+        locationInfo: globalLocation,
+      }));
+      
+      // Añadir a los registros existentes
+      setSignatureRecords(prev => [...prev, ...newSignatureRecords]);
+      setSelectedUsers(prev => {
+        const newSelectedUsers = [...prev, ...newUsers];
+        return newSelectedUsers;
+      });
+      
+      // El modal se cerrará solo cuando el usuario presione "Confirmar" en UserSelector
+    } catch (error) {
+      Alert.alert('Error', 'Hubo un problema al seleccionar los usuarios');
+    }
+  }, [signatureRecords, deviceMetadata, globalLocation]);
+
+  const handleCloseUserSelector = useCallback(() => {
+    setShowUserSelector(false);
+  }, []);
+
+  // Memoizar el renderizado de usuarios seleccionados para evitar re-renders innecesarios
+  const renderSelectedUsers = useCallback(() => {
+    if (signatureRecords.length === 0) return null;
+    
+    return signatureRecords.map((signature) => {
+      const { user, status, signedAt } = signature;
+      const isCompleted = status === 'signed';
+      
+      return (
+        <View key={user.id} style={styles.selectedUserItem}>
+          <View style={styles.selectedUserInfo}>
+            <Text style={styles.selectedUserName}>{user.firstName} {user.lastName}</Text>
+            <Text style={styles.selectedUserRole}>{user.role}</Text>
+          </View>
+          <View style={styles.selectedUserStatus}>
+            {isCompleted ? (
+              <View style={styles.userCompletedIndicator}>
+                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                <Text style={styles.userCompletedText}>Firmado</Text>
+                {signedAt && (
+                  <Text style={styles.signedTime}>
+                    {signedAt.toLocaleTimeString()}
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <View style={styles.userPendingIndicator}>
+                <Ionicons name="time-outline" size={24} color="#FF9800" />
+                <Text style={styles.userPendingText}>Pendiente</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    });
+  }, [signatureRecords]);
+
   const captureDeviceAndLocationMetadata = async () => {
     try {
       // Capturar información del dispositivo
@@ -135,14 +315,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   // Función helper para mantener el orden original de los campos
   const getOrderedFields = () => {
-    console.log('🔍 Debugging template structure:', {
-      hasTemplate: !!template,
-      hasStructure: !!template?.structure,
-      structureType: typeof template?.structure,
-      isArray: Array.isArray(template?.structure),
-      structureLength: template?.structure?.length
-    });
-    
     // Verificar si el template tiene la estructura esperada
     if (!template.structure || !Array.isArray(template.structure)) {
       console.warn('Template no tiene la estructura esperada:', template);
@@ -158,8 +330,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       };
     });
     
-    console.log('📋 Campos ordenados:', orderedFields.length);
-    console.log('📋 Detalle de campos:', orderedFields.map(f => ({ id: f.id, type: f.type, label: f.label })));
     return orderedFields;
   };
 
@@ -225,30 +395,10 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       }
     });
     
-    console.log('🔍 getVisibleElementsForPage:', {
-      currentPage,
-      minIndex,
-      maxIndex,
-      visibleElementsCount: visibleElements.length,
-      visibleElements: visibleElements.map(f => ({ id: f.id, type: f.type, label: f.label }))
-    });
-    
     return visibleElements;
   };
   
   const visibleElements = getVisibleElementsForPage();
-  
-  console.log('🔍 Debugging pagination:', {
-    totalFields: orderedFields.length,
-    inputFieldsCount: inputFields.length,
-    currentPage,
-    totalPages,
-    fieldsPerPage,
-    currentInputFieldsCount: currentInputFields.length,
-    visibleFieldIds: Array.from(visibleFieldIds),
-    visibleElementsCount: visibleElements.length,
-    visibleElements: visibleElements.map(f => ({ id: f.id, type: f.type, label: f.label }))
-  });
 
   // Crear esquema de validación dinámico
   const createValidationSchema = () => {
@@ -496,16 +646,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   const renderField = (field: any) => {
     const hasError = !!errors[field.id];
-    
-    // Debug: Log del tipo de campo para ubicación GPS
-    if (field.label && field.label.toLowerCase().includes('ubicación')) {
-      console.log('🗺️ Campo de ubicación detectado:', {
-        id: field.id,
-        type: field.type,
-        label: field.label,
-        field: field
-      });
-    }
     
     // Campos especiales que no necesitan label ni contenedor estándar
     if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer' || field.type === 'info_text') {
@@ -1350,142 +1490,116 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       {field.config?.acceptanceText || 'Acepto los términos y condiciones de este documento'}
                     </Text>
                     
-                    {/* Selector de trabajador */}
-                    <View style={styles.workerSelectorContainer}>
-                      <Text style={styles.workerSelectorLabel}>Seleccionar trabajador que firma:</Text>
-                      <View style={styles.workersList}>
-                        {(field.config?.requiredSigners || []).map((signer: any, index: number) => {
-                          const currentSignatures = controllerField.value?.signatures || [];
-                          const hasSignedAlready = currentSignatures.some((sig: any) => sig.signerId === signer.id);
-                          
-                          return (
-                            <TouchableOpacity
-                              key={signer.id || index}
-                              style={[
-                                styles.workerItem,
-                                hasSignedAlready && styles.workerItemSigned
-                              ]}
-                              onPress={() => {
-                                if (hasSignedAlready) {
-                                  Alert.alert('Información', `${signer.name} ya ha firmado este documento.`);
-                                  return;
-                                }
-                                
-                                Alert.alert(
-                                  'Confirmar Firma',
-                                  `¿Confirma que ${signer.name} acepta los términos de este documento?`,
-                                  [
-                                    { text: 'Cancelar', style: 'cancel' },
-                                    {
-                                      text: 'Confirmar',
-                                      onPress: () => {
-                                        const newSignature = {
-                                          signerId: signer.id,
-                                          signerName: signer.name,
-                                          signerRole: signer.role || 'Trabajador',
-                                          timestamp: new Date().toISOString(),
-                                          deviceInfo: deviceMetadata,
-                                          location: globalLocation,
-                                          documentHash: `hash_${template.id}_${Date.now()}`,
-                                          signatureMethod: 'worker_acceptance',
-                                          accepted: true,
-                                        };
-                                        
-                                        const currentValue = controllerField.value || {};
-                                        const currentSignatures = currentValue.signatures || [];
-                                        const updatedSignatures = [...currentSignatures, newSignature];
-                                        
-                                        const allRequiredSigners = field.config?.requiredSigners || [];
-                                        const isComplete = updatedSignatures.length === allRequiredSigners.length;
-                                        
-                                        const signatureData = {
-                                          ...currentValue,
-                                          signatures: updatedSignatures,
-                                          status: isComplete ? 'completed' : 'partial',
-                                          completedAt: isComplete ? new Date().toISOString() : null,
-                                          totalRequired: allRequiredSigners.length,
-                                          totalSigned: updatedSignatures.length,
-                                        };
-                                        
-                                        controllerField.onChange(signatureData);
-                                        
-                                        if (isComplete) {
-                                          Alert.alert('Éxito', 'Todas las firmas han sido completadas.');
-                                        } else {
-                                          Alert.alert('Firma Registrada', `Firma de ${signer.name} registrada exitosamente.`);
-                                        }
-                                      }
-                                    }
-                                  ]
-                                );
-                              }}
-                            >
-                              <View style={styles.workerInfo}>
-                                <Text style={styles.workerName}>{signer.name}</Text>
-                                <Text style={styles.workerRole}>{signer.role || 'Trabajador'}</Text>
-                              </View>
-                              
-                              <View style={styles.workerStatus}>
-                                {hasSignedAlready ? (
-                                  <View style={styles.signedIndicator}>
-                                    <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                                    <Text style={styles.signedText}>Firmado</Text>
-                                  </View>
-                                ) : (
-                                  <View style={styles.pendingIndicator}>
-                                    <Ionicons name="time-outline" size={24} color="#FF9800" />
-                                    <Text style={styles.pendingText}>Pendiente</Text>
-                                  </View>
-                                )}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                    
-                    {/* Resumen de firmas */}
-                    {controllerField.value?.signatures && controllerField.value.signatures.length > 0 && (
-                      <View style={styles.signaturesStatus}>
-                        <Text style={styles.signaturesStatusTitle}>Estado de Firmas:</Text>
-                        <Text style={styles.signaturesStatusText}>
-                          {controllerField.value.totalSigned || 0} de {controllerField.value.totalRequired || 0} firmas completadas
+                    {/* Botón para seleccionar/añadir usuarios */}
+                    <TouchableOpacity
+                      style={styles.userSelectButton}
+                      onPress={() => setShowUserSelector(true)}
+                    >
+                      <View style={styles.userSelectButtonContent}>
+                        <Text style={styles.userSelectButtonText}>
+                          {allSignaturesForDisplay.length === 0 
+                            ? 'Seleccionar usuarios para firmar' 
+                            : `Gestionar firmas (${allSignaturesForDisplay.length} usuarios)`
+                          }
                         </Text>
+                        <Ionicons name="person-add" size={20} color="#34495e" />
+                      </View>
+                    </TouchableOpacity>
+                    
+                    {/* Lista de usuarios seleccionados */}
+                    {allSignaturesForDisplay.length > 0 && (
+                      <View style={styles.selectedUsersContainer}>
+                        <Text style={styles.selectedUsersLabel}>Usuarios seleccionados:</Text>
+                        <View style={styles.selectedUsersList}>
+                          {renderSelectedUsers()}
+                        </View>
                         
-                        {controllerField.value.status === 'completed' && (
-                          <View style={styles.completedStatus}>
-                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                            <Text style={styles.completedStatusText}>Documento completamente firmado</Text>
-                          </View>
-                        )}
-                        
-                        {/* Lista de firmas registradas */}
-                        <View style={styles.signaturesList}>
-                          {controllerField.value.signatures.map((signature: any, index: number) => (
-                            <View key={index} style={styles.signatureItem}>
-                              <Text style={styles.signatureItemName}>✓ {signature.signerName}</Text>
-                              <Text style={styles.signatureItemTime}>
-                                {new Date(signature.timestamp).toLocaleString()}
-                              </Text>
-                            </View>
-                          ))}
+                        {/* Botones de acción */}
+                        <View style={styles.multiSignatureButtons}>
+                          <TouchableOpacity
+                            style={[styles.multiSignatureButton, styles.multiSignatureButtonPrimary]}
+                            onPress={() => setShowPendingSignatures(true)}
+                          >
+                            <Text style={[styles.multiSignatureButtonText, styles.multiSignatureButtonTextPrimary]}>
+                              Gestionar Firmas
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.multiSignatureButton}
+                            onPress={() => {
+                              console.log('Reiniciando selección de usuarios');
+                              try {
+                                setSelectedUsers(() => []);
+                                setSignatureRecords(() => []);
+                                console.log('Reinicio completado');
+                              } catch (error) {
+                                console.error('Error al reiniciar:', error);
+                              }
+                            }}
+                          >
+                            <Text style={styles.multiSignatureButtonText}>Reiniciar</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
                     )}
                     
-                    {/* Información de trazabilidad */}
-                    {controllerField.value?.signatures && controllerField.value.signatures.length > 0 && (
-                      <View style={styles.traceabilityInfo}>
-                        <Text style={styles.traceabilityTitle}>Información de Trazabilidad:</Text>
-                        <Text style={styles.traceabilityText}>📱 Dispositivo: {deviceMetadata?.platform} {deviceMetadata?.version}</Text>
-                        <Text style={styles.traceabilityText}>🕐 Última actualización: {new Date().toLocaleString()}</Text>
-                        {globalLocation && (
-                          <Text style={styles.traceabilityText}>
-                            📍 Ubicación: {globalLocation.latitude.toFixed(6)}, {globalLocation.longitude.toFixed(6)}
-                          </Text>
-                        )}
-                      </View>
+                    {/* Modal para seleccionar usuarios */}
+                    {showUserSelector && (
+                      <Modal
+                        visible={showUserSelector}
+                        animationType="slide"
+                        presentationStyle="pageSheet"
+                        onRequestClose={handleCloseUserSelector}
+                      >
+                        <UserSelector
+                          visible={showUserSelector}
+                          onUsersSelected={handleUserSelection}
+                          onClose={handleCloseUserSelector}
+                          selectedUsers={selectedUsers}
+                          title={allSignaturesForDisplay.length === 0 ? 'Seleccionar Usuarios' : 'Añadir Más Usuarios'}
+                          subtitle={allSignaturesForDisplay.length === 0 
+                            ? 'Selecciona los usuarios que deben firmar el documento'
+                            : 'Selecciona usuarios adicionales para firmar'
+                          }
+                        />
+                      </Modal>
                     )}
+                    
+                    {/* Modal para gestionar firmas pendientes */}
+                    <Modal
+                      visible={showPendingSignatures}
+                      animationType="slide"
+                      presentationStyle="pageSheet"
+                    >
+                      <PendingSignatures
+                        pendingSignatures={allSignaturesForDisplay}
+                        onSignatureComplete={async (userId, signature) => {
+                          console.log('Signature completed for user:', userId, signature);
+                          // Obtener IP del cliente
+                          const clientIp = await getClientIpAddress();
+                          // Update the signature status
+                          setSignatureRecords(prev => prev.map((record: SignatureRecord) => 
+                            record.user.id === userId 
+                              ? { 
+                                  ...record, 
+                                  status: 'signed' as const, 
+                                  signedAt: new Date(), 
+                                  signature,
+                                  ipAddress: clientIp,
+                                  deviceInfo: deviceMetadata,
+                                  locationInfo: globalLocation,
+                                }
+                              : record
+                          ));
+                        }}
+                        onRemoveUser={(userId) => {
+                          setSignatureRecords(prev => prev.filter((record: SignatureRecord) => record.user.id !== userId));
+                          setSelectedUsers(prev => prev.filter(user => user.id !== userId));
+                        }}
+                        onClose={() => setShowPendingSignatures(false)}
+                        documentTitle={field.config?.documentTitle || template.name}
+                      />
+                    </Modal>
                   </View>
                 );
 
@@ -1509,7 +1623,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
     );
   };
 
-  const onFormSubmit = (data: FormData) => {
+  const onFormSubmit = async (data: FormData) => {
     // Limpiar los datos para enviar solo valores planos
     const cleanData: any = {};
     
@@ -1601,6 +1715,25 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       }]
     };
     
+    // Filtrar solo firmas pendientes para enviar
+    const onlyPendingSignatures = pendingSignatures.filter(signature => signature.status === 'pending');
+
+    // Procesar firmas completadas
+    const processedCompletedSignatures = completedSignatures.map(sig => ({
+      userId: sig.user.id,
+      userName: `${sig.user.firstName} ${sig.user.lastName}`,
+      userEmail: sig.user.email,
+      userRole: sig.user.role,
+      signatureData: sig.signature,
+      signedAt: sig.signedAt,
+      ipAddress: sig.ipAddress,
+      geolocation: sig.locationInfo,
+      deviceInfo: sig.deviceInfo,
+      visualSignature: sig.signature,
+      userAgent: sig.deviceInfo?.userAgent,
+      acceptanceText: 'Acepto los términos y condiciones'
+    }));
+
     // Agregar datos especiales y estructura enriquecida
     const enrichedData = {
       ...cleanData,
@@ -1610,19 +1743,23 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       _files: files,
       _qrCodes: qrCodes,
       _enrichedResponses: enrichedResponses, // Estructura enriquecida para revisiones
+      _pendingSignatures: onlyPendingSignatures.map(sig => ({ // Información de firmas pendientes
+        userId: sig.user.id,
+        userName: `${sig.user.firstName} ${sig.user.lastName}`,
+        userEmail: sig.user.email,
+        userRole: sig.user.role
+      })),
+      _completedSignatures: processedCompletedSignatures // Información de firmas completadas
     };
     
-    console.log('📤 Enviando datos con estructura enriquecida:', enrichedData);
     onSubmit(enrichedData);
   };
 
   const handleSave = () => {
     const currentData = watch();
     
-    // Limpiar los datos para enviar solo valores planos
     const cleanData: any = {};
     
-    // Solo incluir campos que tengan valores válidos
     inputFields.forEach((field: any) => {
       const value = currentData[field.id];
       if (value !== undefined && value !== null && value !== '') {
@@ -1630,14 +1767,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       }
     });
     
-    // Crear estructura enriquecida para revisiones con toda la estructura del template
     const enrichedResponses = {
       sections: [{
         id: 'main_section',
         title: template.name || 'Formulario',
         description: template.description,
         questions: orderedFields.map((field: any) => {
-          // Para campos de entrada, incluir respuesta
           if (field.type !== 'section' && field.type !== 'paragraph' && field.type !== 'info_text') {
             return {
               id: field.id,
@@ -1661,7 +1796,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
             };
           }
           
-          // Para títulos de sección
           if (field.type === 'section') {
             return {
               id: field.id,
@@ -1677,7 +1811,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
             };
           }
           
-          // Para párrafos
           if (field.type === 'paragraph') {
             return {
               id: field.id,
@@ -1693,7 +1826,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
             };
           }
           
-          // Para otros tipos (separadores, etc.)
           return {
             id: field.id,
             text: field.label || field.content || '',
@@ -1710,7 +1842,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       }]
     };
     
-    // Agregar datos especiales y estructura enriquecida
     const enrichedData = {
       ...cleanData,
       _signatures: signatures,
@@ -1721,7 +1852,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       _enrichedResponses: enrichedResponses, // Estructura enriquecida para revisiones
     };
     
-    console.log('💾 Guardando datos con estructura enriquecida:', enrichedData);
     onSave?.(enrichedData);
   };
 
@@ -1757,12 +1887,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         scrollEnabled={!isSigningActive}
       >
         {visibleElements.map((field: any) => {
-          console.log('🎯 Rendering field:', {
-            id: field.id,
-            type: field.type,
-            label: field.label
-          });
-          
           // Renderizar título de sección
           if (field.type === 'sectionHeader') {
             const level = field.config?.level || 2;
@@ -2965,6 +3089,146 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   
+  // Estilos para nuevos elementos de múltiples firmas
+  userSelectButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  userSelectButtonContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  userSelectButtonText: {
+    fontSize: 16,
+    color: '#34495e',
+    fontWeight: '500',
+    flex: 1,
+  },
+  multiSignatureTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  multiSignatureAcceptanceText: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  selectedUsersContainer: {
+    marginTop: 16,
+  },
+  selectedUsersLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#34495e',
+    marginBottom: 12,
+  },
+  selectedUsersList: {
+    gap: 8,
+  },
+  selectedUserItem: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  selectedUserInfo: {
+    flex: 1,
+  },
+  selectedUserName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  selectedUserRole: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginTop: 2,
+  },
+  selectedUserStatus: {
+    alignItems: 'center',
+  },
+  userPendingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  userPendingText: {
+    fontSize: 12,
+    color: '#FF9800',
+    fontWeight: '600',
+  },
+  userCompletedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  userCompletedText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  signedTime: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  multiSignatureButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  multiSignatureButton: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  multiSignatureButtonPrimary: {
+    backgroundColor: '#3498db',
+    borderColor: '#3498db',
+  },
+  multiSignatureButtonText: {
+    fontSize: 14,
+    color: '#34495e',
+    fontWeight: '600',
+  },
+  multiSignatureButtonTextPrimary: {
+    color: '#ffffff',
+  },
+  
   // Estilos adicionales para firma digital mejorada
   legalTermsContainer: {
     backgroundColor: '#f8f9fa',
@@ -3219,5 +3483,146 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+// Función helper exportable para crear firmas con un ID de documento específico
+export const createSignaturesForDocument = async (documentId: number | string | null, documentTitle: string, signers: any[], completedSignatures?: any[]): Promise<{ signatureIds: number[] } | void> => {
+  // Si no hay documentId, crear firmas sin asociar al documento (se asociarán después)
+  let numericDocumentId: number | null = null;
+  
+  if (documentId) {
+    // Verificar si es un ID offline (string que empieza con 'offline_')
+    if (typeof documentId === 'string' && documentId.startsWith('offline_')) {
+      console.log('📱 ID offline detectado, no se pueden crear firmas digitales hasta que se sincronice');
+      return;
+    }
+
+    // Convertir a número si es string
+    numericDocumentId = typeof documentId === 'string' ? parseInt(documentId, 10) : documentId;
+    
+    if (isNaN(numericDocumentId)) {
+      console.error('❌ No se pudo convertir documentId a número:', documentId);
+      throw new Error('Document ID debe ser convertible a número');
+    }
+
+    if (numericDocumentId <= 0) {
+      console.error('❌ documentId debe ser mayor que 0:', numericDocumentId);
+      throw new Error('Document ID debe ser un número positivo válido');
+    }
+  }
+
+  if (!signers || signers.length === 0) {
+    console.log('❌ No hay firmantes para crear solicitudes');
+    return;
+  }
+
+  try {
+    // Procesar firmas completadas si existen
+    const processedCompletedSignatures = completedSignatures?.map(signature => ({
+      userId: signature.userId,
+      signatureData: signature.signatureData,
+      signedAt: signature.signedAt?.toISOString() || new Date().toISOString(),
+      ipAddress: signature.ipAddress || '127.0.0.1',
+      geolocation: signature.geolocation || null,
+      deviceInfo: signature.deviceInfo || null,
+      visualSignature: signature.visualSignature,
+      userAgent: signature.userAgent || 'Mobile App',
+      acceptanceText: signature.acceptanceText || 'Firma completada desde la aplicación móvil'
+    })) || [];
+
+    // Combinar firmantes pendientes y completados para la lista de signers
+    const allSigners = [...signers];
+    
+    // Agregar usuarios que completaron firmas pero no están en la lista de pendientes
+    if (completedSignatures && completedSignatures.length > 0) {
+      completedSignatures.forEach(completed => {
+        const existsInSigners = signers.some(signer => signer.userId === completed.userId);
+        if (!existsInSigners) {
+          // Extraer información del usuario desde signatureData si está disponible
+          let userEmail = completed.userEmail;
+          let userRole = completed.userRole;
+          
+          // Si no están disponibles directamente, intentar extraer del signatureData
+          if (!userEmail || !userRole) {
+            try {
+              const signatureData = typeof completed.signatureData === 'string' 
+                ? JSON.parse(completed.signatureData) 
+                : completed.signatureData;
+              
+              if (signatureData && signatureData.user) {
+                userEmail = userEmail || signatureData.user.email;
+                userRole = userRole || signatureData.user.role;
+              }
+            } catch (error) {
+              console.warn('Error parsing signatureData:', error);
+            }
+          }
+          
+          allSigners.push({
+            userId: completed.userId,
+            userEmail: userEmail,
+            userRole: userRole
+          });
+        }
+      });
+    }
+
+    const signatureData: any = {
+      signers: allSigners.map((signer, index) => ({
+        userId: signer.userId,
+        email: signer.userEmail,
+        role: signer.userRole,
+        order: index + 1
+      })),
+      requiresAllSignatures: true,
+      expirationHours: 168, // 7 días
+      notificationMessage: `Nueva solicitud de firma para: ${documentTitle}`,
+      ...(processedCompletedSignatures.length > 0 && { completedSignatures: processedCompletedSignatures })
+    };
+    
+    // Solo incluir documentId si existe
+    if (numericDocumentId) {
+      signatureData.documentId = numericDocumentId;
+    }
+
+    const result = await signaturesApi.createMultipleSignatures(signatureData);
+
+    // Extraer los IDs de las firmas creadas
+    let signatureIds: number[] = [];
+    
+    // Extraer signatureIds del array de signers (puede estar en result.signers o result.data.signers)
+    if (result?.signers && Array.isArray(result.signers)) {
+      signatureIds = result.signers
+        .map((signer: any) => signer.signatureId)
+        .filter((id: any) => id !== undefined && id !== null);
+    } else if (result?.data?.signers && Array.isArray(result.data.signers)) {
+      signatureIds = result.data.signers
+        .map((signer: any) => signer.signatureId)
+        .filter((id: any) => id !== undefined && id !== null);
+    } else {
+      signatureIds = [];
+    }
+    Alert.alert(
+      'Éxito', 
+      `Se han creado ${signers.length} solicitudes de firma digitales`,
+      [{ text: 'OK' }]
+    );
+
+    return { signatureIds };
+  } catch (error: any) {
+    console.error('❌ Error completo creando firmas digitales:', error);
+    console.error('❌ Error message:', error?.message);
+    console.error('❌ Error response:', error?.response?.data);
+    
+    // Si es un error de autenticación, no mostrar alert de error
+    // ya que el manejo se hace en el nivel superior
+    if (error?.message?.includes('Sesión expirada') || error?.status === 401) {
+      console.warn('⚠️ Error de autenticación detectado en createSignaturesForDocument');
+    } else {
+      Alert.alert('Error', `No se pudieron crear las solicitudes de firma: ${error?.message || 'Error desconocido'}`);
+    }
+    
+    throw error;
+  }
+};
 
 export default FormRenderer;

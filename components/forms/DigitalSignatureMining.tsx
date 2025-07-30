@@ -160,6 +160,10 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
 
   const completeOfflineSignature = async () => {
     try {
+      if (!user) {
+        throw new Error('Usuario no encontrado');
+      }
+
       const offlineSignature = await createSignature({
         documentId,
         userId: user.id,
@@ -187,7 +191,7 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
         [{ text: "OK" }]
       );
     } catch (error) {
-      throw new Error(`Error en firma offline: ${error.message}`);
+      throw new Error(`Error en firma offline: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -202,9 +206,10 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
         visualSignature: visualSignature || undefined,
         miningType,
         priority,
+        signatureType: 'simple',
       };
 
-      const response = await apiRequest("/api/v1/digital-signatures/initiate", {
+      const response: any = await apiRequest("/api/v1/digital-signatures/initiate", {
         method: "POST",
         body: JSON.stringify(signatureRequest),
       });
@@ -225,9 +230,9 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
             { text: "Cancelar", style: "cancel" },
             {
               text: "Continuar Offline",
-              onPress: () => {
+              onPress: async () => {
                 setForceOfflineMode(true);
-                completeOfflineSignature();
+                await completeOfflineSignature();
               },
             },
           ]
@@ -247,7 +252,7 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
     try {
       setLoading(true);
 
-      const response = await apiRequest(
+      const response: any = await apiRequest(
         "/api/v1/digital-signatures/verify-otp",
         {
           method: "POST",
@@ -298,7 +303,7 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
     <View style={styles.connectionStatus}>
       <View style={styles.statusRow}>
         <Ionicons
-          name={isOnline ? "wifi" : "wifi-off"}
+          name={isOnline ? "wifi" : "wifi"}
           size={16}
           color={isOnline ? "#4CAF50" : "#ff6b35"}
         />
@@ -314,7 +319,7 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
 
       <View style={styles.statusRow}>
         <Ionicons
-          name={locationStatus === "valid" ? "location" : "location-off"}
+          name={locationStatus === "valid" ? "location" : "location"}
           size={16}
           color={locationStatus === "valid" ? "#4CAF50" : "#ff6b35"}
         />
@@ -530,7 +535,6 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
         <SignatureCanvas
           onOK={onSignatureOK}
           onClear={onSignatureClear}
-          onCancel={() => setShowSignatureModal(false)}
           descriptionText="Firme en el área de abajo"
           clearText="Limpiar"
           confirmText="Confirmar"
@@ -553,13 +557,13 @@ export const DigitalSignatureMining: React.FC<DigitalSignatureMiningProps> = ({
     return labels[type] || "Documento Minero";
   };
 
-  const getPriorityColor = (priority: string): string => {
+  const getPriorityColor = (priorityLevel: "critical" | "high" | "medium"): string => {
     const colors = {
       critical: "#F44336",
       high: "#FF9800",
       medium: "#4CAF50",
     };
-    return colors[priority] || "#4CAF50";
+    return colors[priorityLevel] || "#4CAF50";
   };
 
   return (

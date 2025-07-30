@@ -322,6 +322,7 @@ export const MultipleSignature: React.FC<MultipleSignatureProps> = ({
           <Text style={styles.infoText}>
             Se creará una sesión de firma que permitirá a cada persona firmar
             desde su propio dispositivo. La sesión expira en 24 horas.
+            Cada firmante deberá ingresar su propia contraseña para confirmar su firma.
           </Text>
         </View>
       </View>

@@ -162,7 +162,13 @@ export default function RecurringActivitiesScreen() {
         },
       };
 
-      await submitForm(submission);
+      console.log('📤 Submission object:', JSON.stringify(submission, null, 2));
+
+      // Enviar el formulario y obtener el resultado con el ID del documento
+      const result = await submitForm(submission);
+      console.log('📋 Resultado completo del envío:', JSON.stringify(result, null, 2));
+      
+      console.log('✅ Formulario enviado exitosamente');
       
       Alert.alert(
         'Éxito',
@@ -179,6 +185,7 @@ export default function RecurringActivitiesScreen() {
         ]
       );
     } catch (err) {
+      console.error('Error al completar actividad:', err);
       Alert.alert('Error', 'No se pudo completar la actividad');
     }
   };
@@ -304,19 +311,10 @@ export default function RecurringActivitiesScreen() {
           <Text style={styles.headerTitle}>Completar Actividad</Text>
           <View style={styles.placeholder} />
         </View>
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>{selectedActivity.name}</Text>
-          <Text style={styles.formDescription}>
-            Formulario para completar la actividad recurrente
-          </Text>
-          {/* Aquí iría el FormRenderer real cuando esté disponible */}
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleSubmitForm}
-          >
-            <Text style={styles.completeButtonText}>Completar Actividad</Text>
-          </TouchableOpacity>
-        </View>
+        <FormRenderer
+          template={selectedActivity}
+          onSubmit={handleSubmitForm}
+        />
       </View>
     );
   }
