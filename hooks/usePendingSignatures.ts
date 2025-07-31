@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiRequest } from '@/lib/api/config';
+import { useAuth } from '@/contexts/auth-context';
 import { pushNotificationService, PushNotificationData } from '@/services/push-notification.service';
 import * as Notifications from 'expo-notifications';
 
@@ -10,65 +11,84 @@ export interface PendingSignature {
   documentId: number;
   documentTitle: string;
   documentType: string;
-  requesterName: string;
-  requesterEmail: string;
+  documentContent?: any;
+  documentFields?: any;
+  requestedBy: {
+    id: number;
+    name: string;
+    email: string;
+  };
   priority: 'low' | 'medium' | 'high' | 'critical';
-  expiresAt: string;
+  expiresAt?: string;
   createdAt: string;
-  isViewed: boolean;
+  isViewed?: boolean;
   metadata?: {
-    location?: string;
-    department?: string;
-    category?: string;
+    multipleSignature?: boolean;
+    signerRole?: string;
+    signerOrder?: number;
+    requiresAllSignatures?: boolean;
+    viewedAt?: string;
   };
 }
 
-export interface PendingSignaturesStatistics {
+export interface PendingSignaturesStats {
   total: number;
   critical: number;
   expiring: number;
 }
 
 export interface PendingSignaturesResponse {
-  signatures: PendingSignature[];
-  statistics: PendingSignaturesStatistics;
+  pendingSignatures: PendingSignature[];
+  totalCount: number;
 }
 
 export function usePendingSignatures() {
   const [signatures, setSignatures] = useState<PendingSignature[]>([]);
-  const [statistics, setStatistics] = useState<PendingSignaturesStatistics>({
+  const [statistics, setStatistics] = useState<PendingSignaturesStats>({
     total: 0,
     critical: 0,
     expiring: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const router = useRouter();
+
+  // Función para actualizar el badge count
+  const setBadgeCount = useCallback(async (count: number) => {
+    try {
+      await Notifications.setBadgeCountAsync(count);
+    } catch (error) {
+      console.error('Error setting badge count:', error);
+    }
+  }, []);
 
   // Cargar firmas pendientes
   const loadPendingSignatures = useCallback(async () => {
+    if (!user) return;
+
     try {
       setError(null);
-      const response = await apiRequest<{success: boolean; data: PendingSignaturesResponse}>(
-        '/pending-signatures'
-      );
+      const response = await apiRequest<PendingSignaturesResponse>('/pending-signatures');
       
-      if (response.success) {
-        setSignatures(response.data.signatures);
-        setStatistics(response.data.statistics);
-        
-        // Actualizar badge count con el número de firmas pendientes
-        await pushNotificationService.setBadgeCount(response.data.statistics.total);
-      }
+      setSignatures(response.pendingSignatures || []);
+      setStatistics({
+        total: response.totalCount || 0,
+        critical: 0,
+        expiring: 0,
+      });
+      
+      // Actualizar badge count
+      setBadgeCount(response.totalCount || 0);
     } catch (err: any) {
       console.error('Error loading pending signatures:', err);
-      setError(err.message || 'No se pudieron cargar las firmas pendientes');
+      setError(err.message || 'Error al cargar firmas pendientes');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   // Marcar firma como vista
   const markAsViewed = useCallback(async (signatureId: number) => {
@@ -128,8 +148,50 @@ export function usePendingSignatures() {
     }
   }, [router, markAsViewed]);
 
-  // Refrescar datos
-  const refresh = useCallback(() => {
+  // Procesar firma digital
+  const signDocument = useCallback(async (
+    signatureId: number,
+    signatureData: {
+      password: string;
+      acceptedTerms: boolean;
+      visualSignature?: string;
+      deviceInfo: {
+        platform: string;
+        version: string;
+        model: string;
+        fingerprint: string;
+      };
+      location?: {
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+      };
+    }
+  ) => {
+    try {
+      const response = await apiRequest<any>(
+        `/pending-signatures/${signatureId}/sign`,
+        {
+          method: 'POST',
+          body: JSON.stringify(signatureData),
+        }
+      );
+
+      // La función apiRequest ya extrae automáticamente la propiedad 'data' 
+      // de respuestas con estructura {success: true, data: ...}
+      // Refrescar la lista después de firmar
+      await loadPendingSignatures();
+      return response;
+    } catch (error: any) {
+      console.error('Error signing document:', error);
+      throw error;
+    }
+  }, [loadPendingSignatures]);
+
+
+ 
+   // Refrescar datos
+   const refresh = useCallback(() => {
     setRefreshing(true);
     loadPendingSignatures();
   }, [loadPendingSignatures]);
@@ -209,13 +271,17 @@ export function usePendingSignatures() {
   }, []);
 
   const getUnreadCount = useCallback(() => {
-    return signatures.filter(s => !s.isViewed).length;
+    return (signatures || []).filter(s => !s.isViewed).length;
   }, [signatures]);
 
   return {
     // Data
-    signatures,
-    statistics,
+    signatures: signatures || [],
+    statistics: statistics || {
+      total: 0,
+      critical: 0,
+      expiring: 0,
+    },
     loading,
     refreshing,
     error,
@@ -225,6 +291,7 @@ export function usePendingSignatures() {
     markAsViewed,
     getSignatureDetails,
     navigateToSignature,
+    signDocument,
     refresh,
     
     // Utilities

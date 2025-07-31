@@ -12,114 +12,160 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 import usePendingSignatures, { PendingSignature } from '@/hooks/usePendingSignatures';
+import { useRouter } from 'expo-router';
 
 export default function PendingSignatures() {
   const { user } = useAuth();
+  const router = useRouter();
   const {
     signatures,
     statistics,
     loading,
     refreshing,
     error,
-    navigateToSignature,
     refresh,
     getPriorityColor,
     getPriorityLabel,
-    formatDate,
-    isExpiringSoon,
+    markAsViewed,
   } = usePendingSignatures();
 
-  const renderSignatureItem = ({ item }: { item: PendingSignature }) => (
-    <TouchableOpacity
-      style={[
-        styles.signatureCard,
-        !item.isViewed && styles.unreadCard,
-        isExpiringSoon(item.expiresAt) && styles.expiringCard,
-      ]}
-      onPress={() => navigateToSignature(item)}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.documentTitle} numberOfLines={2}>
-            {item.documentTitle}
-          </Text>
-          {!item.isViewed && <View style={styles.unreadDot} />}
-        </View>
-        <View style={[
-          styles.priorityBadge,
-          { backgroundColor: getPriorityColor(item.priority) }
-        ]}>
-          <Text style={styles.priorityText}>
-            {getPriorityLabel(item.priority)}
-          </Text>
-        </View>
-      </View>
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-      <View style={styles.cardContent}>
-        <View style={styles.infoRow}>
-          <Ionicons name="person-outline" size={16} color="#666" />
-          <Text style={styles.infoText}>
-            Solicitado por: {item.requesterName}
-          </Text>
-        </View>
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'alert-circle';
+      case 'high': return 'warning';
+      case 'medium': return 'information-circle';
+      default: return 'checkmark-circle';
+    }
+  };
 
-        <View style={styles.infoRow}>
-          <Ionicons name="document-outline" size={16} color="#666" />
-          <Text style={styles.infoText}>
-            Tipo: {item.documentType}
-          </Text>
-        </View>
+  const handleViewDocument = (signature: any) => {
+    // Marcar como visto
+    markAsViewed(signature.id);
+    
+    // Navegar a la vista del documento
+    router.push({
+      pathname: '/document-viewer',
+      params: {
+        documentId: signature.documentId,
+        signatureId: signature.id,
+        title: signature.documentTitle,
+        content: JSON.stringify(signature.documentContent),
+        fields: JSON.stringify(signature.documentFields),
+      },
+    });
+  };
 
-        {item.metadata?.department && (
+  const handleSignDocument = (signature: any) => {
+    // Marcar como visto
+    markAsViewed(signature.id);
+    
+    // Navegar a la pantalla de firma
+    router.push({
+      pathname: '/signature-process',
+      params: {
+        signatureId: signature.id,
+        documentId: signature.documentId,
+        documentTitle: signature.documentTitle,
+        requiresVisualSignature: signature.metadata?.requiresVisualSignature || false,
+      },
+    });
+  };
+
+  const renderSignatureItem = ({ item }: { item: PendingSignature }) => {
+    const isExpiring = item.priority === 'high' || item.priority === 'critical';
+    const isCritical = item.priority === 'critical';
+    
+    return (
+      <View
+        style={[
+          styles.signatureCard,
+          !item.isViewed && styles.unreadCard,
+          isExpiring && styles.expiringCard,
+          isCritical && styles.criticalCard,
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.documentTitle} numberOfLines={2}>
+              {item.documentTitle}
+            </Text>
+            {!item.isViewed && <View style={styles.unreadDot} />}
+          </View>
+          
+          <View style={styles.priorityContainer}>
+            <Ionicons
+              name={getPriorityIcon(item.priority)}
+              size={16}
+              color={getPriorityColor(item.priority)}
+            />
+          </View>
+        </View>
+        
+        <View style={styles.cardContent}>
           <View style={styles.infoRow}>
-            <Ionicons name="business-outline" size={16} color="#666" />
+             <Ionicons name="person-outline" size={14} color="#666" />
+             <Text style={styles.infoText}>
+               {item.requestedBy.name}
+             </Text>
+           </View>
+          
+          <View style={styles.infoRow}>
+            <Ionicons name="document-outline" size={14} color="#666" />
             <Text style={styles.infoText}>
-              Departamento: {item.metadata.department}
+              {item.documentType === 'template' ? 'Plantilla' : 'Documento personalizado'}
             </Text>
           </View>
-        )}
-
-        <View style={styles.infoRow}>
-          <Ionicons name="time-outline" size={16} color="#666" />
-          <Text style={styles.infoText}>
-            Vence: {formatDate(item.expiresAt)}
+          
+          {item.expiresAt && (
+            <View style={styles.infoRow}>
+              <Ionicons name="time-outline" size={14} color="#666" />
+              <Text style={[styles.infoText, isExpiring && styles.expiringText]}>
+                Vence: {formatDate(item.expiresAt)}
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.cardFooter}>
+          <Text style={styles.createdDate}>
+            Creado: {formatDate(item.createdAt)}
           </Text>
+          
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.viewButton}
+              onPress={() => handleViewDocument(item)}
+            >
+              <Ionicons name="eye-outline" size={16} color="#007AFF" />
+              <Text style={styles.viewButtonText}>Ver</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.signButton}
+              onPress={() => handleSignDocument(item)}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" />
+              <Text style={styles.signButtonText}>Firmar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-
-      <View style={styles.cardFooter}>
-        <Text style={styles.createdDate}>
-          Creado: {formatDate(item.createdAt)}
-        </Text>
-        <Ionicons name="chevron-forward" size={20} color="#666" />
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.title}>Firmas Pendientes</Text>
-      
-      <View style={styles.statisticsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{statistics.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </View>
-        
-        <View style={[styles.statCard, styles.criticalStat]}>
-          <Text style={[styles.statNumber, styles.criticalNumber]}>
-            {statistics.critical}
-          </Text>
-          <Text style={[styles.statLabel, styles.criticalLabel]}>Críticas</Text>
-        </View>
-        
-        <View style={[styles.statCard, styles.expiringStat]}>
-          <Text style={[styles.statNumber, styles.expiringNumber]}>
-            {statistics.expiring}
-          </Text>
-          <Text style={[styles.statLabel, styles.expiringLabel]}>Por vencer</Text>
-        </View>
-      </View>
     </View>
   );
 
@@ -147,7 +193,7 @@ export default function PendingSignatures() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={signatures}
+        data={signatures || []}
         renderItem={renderSignatureItem}
         keyExtractor={(item) => item.id.toString()}
         ListHeaderComponent={renderHeader}
@@ -155,7 +201,7 @@ export default function PendingSignatures() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
-        contentContainerStyle={signatures.length === 0 ? styles.emptyContainer : undefined}
+        contentContainerStyle={(signatures || []).length === 0 ? styles.emptyContainer : undefined}
         showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
@@ -186,47 +232,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 20,
-  },
-  statisticsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  criticalStat: {
-    backgroundColor: '#ffebee',
-  },
-  expiringStat: {
-    backgroundColor: '#fff3e0',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  criticalNumber: {
-    color: '#d32f2f',
-  },
-  expiringNumber: {
-    color: '#f57c00',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  criticalLabel: {
-    color: '#d32f2f',
-  },
-  expiringLabel: {
-    color: '#f57c00',
   },
   signatureCard: {
     backgroundColor: '#fff',
@@ -312,6 +317,51 @@ const styles = StyleSheet.create({
   createdDate: {
     fontSize: 12,
     color: '#999',
+  },
+  criticalCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF3B30',
+  },
+  priorityContainer: {
+    marginLeft: 8,
+  },
+  expiringText: {
+    color: '#FF8800',
+    fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    backgroundColor: '#fff',
+  },
+  viewButtonText: {
+    color: '#007AFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  signButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
+  },
+  signButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,
