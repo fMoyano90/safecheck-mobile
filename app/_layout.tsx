@@ -76,6 +76,7 @@ function RootLayoutNav() {
                 <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
                 <Stack.Screen name="connectivity-settings" options={{ headerShown: true, title: 'Conectividad' }} />
                 <Stack.Screen name="theme-settings" options={{ headerShown: true, title: 'Tema' }} />
+                <Stack.Screen name="pending-signatures" options={{ headerShown: true, title: 'Firmas Pendientes' }} />
               </Stack>
             </ThemeProvider>
           </NotificationProvider>

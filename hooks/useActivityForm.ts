@@ -83,7 +83,6 @@ export const useActivityForm = ({
           }
           
           await offlineStorage.saveTemplates(templates);
-          console.log('📱 Template guardado para uso offline');
           
         } catch (error) {
           console.warn('⚠️ Error con API online, intentando offline:', error);
@@ -92,7 +91,6 @@ export const useActivityForm = ({
         }
       } else {
         // Sin conexión, usar solo sistema offline
-        console.log('📱 Modo offline: cargando template desde almacenamiento local');
         templateData = await offlineDocumentsApi.getTemplate(activityId, activityType);
       }
       
@@ -106,7 +104,7 @@ export const useActivityForm = ({
       const draftData = await offlineStorage.getDraftForm(activityId);
       if (draftData) {
         console.log('📝 Borrador encontrado para actividad', activityId);
-        // Aquí podrías emitir un evento o callback para cargar el borrador en el formulario
+        // TODO: Aquí podrías emitir un evento o callback para cargar el borrador en el formulario
       }
       
     } catch (error) {
@@ -138,11 +136,6 @@ export const useActivityForm = ({
   };
 
   const convertUriToBase64 = async (uri: string): Promise<string> => {
-    console.log('🔄 convertUriToBase64 llamado con URI:', uri);
-    console.log('🔄 Tipo de URI:', typeof uri);
-    console.log('🔄 Longitud de URI:', uri?.length);
-    console.log('🔄 Primeros 100 caracteres:', uri?.substring(0, 100));
-    
     try {
       // Validar que la URI no sea vacía o inválida
       if (!uri || typeof uri !== 'string' || uri.trim() === '') {
@@ -212,12 +205,9 @@ export const useActivityForm = ({
 
   // Función para procesar imágenes y subirlas directamente a Azure
   const processImages = async (images: any, onProgress?: (progress: any) => void): Promise<any> => {
-    console.log('🖼️ processImages llamado con:', typeof images, images);
-    console.log('🖼️ Contenido detallado:', JSON.stringify(images, null, 2));
-    
     // Validar que images no sea null, undefined, o string vacío
     if (!images || images === '' || images === null || images === undefined) {
-      console.log('🖼️ Images es null/undefined/vacío, retornando null');
+      console.warn('🖼️ Images es null/undefined/vacío, retornando null');
       return null;
     }
 
@@ -262,7 +252,6 @@ export const useActivityForm = ({
         if (typeof image === 'string') {
           if (image.startsWith('file://') || image.startsWith('content://')) {
             try {
-              console.log(`☁️ Subiendo imagen ${i + 1}/${images.length} a Azure...`);
               const fileName = `image_${Date.now()}_${i}.jpg`;
               const azureUrl = await AzureUploadService.uploadImage(
                 image, 
@@ -274,7 +263,6 @@ export const useActivityForm = ({
                 }
               );
               processedImages.push(azureUrl);
-              console.log(`✅ Imagen ${i + 1} subida exitosamente:`, azureUrl);
             } catch (error) {
               console.warn('❌ No se pudo subir imagen a Azure, usando fallback a base64:', image, error);
               try {
@@ -312,14 +300,12 @@ export const useActivityForm = ({
       // Solo procesar strings que parezcan URIs de imagen
       if (images.startsWith('file://') || images.startsWith('content://')) {
         try {
-          console.log('☁️ Subiendo imagen individual a Azure...');
           const fileName = `image_${Date.now()}.jpg`;
           const azureUrl = await AzureUploadService.uploadImage(
             images, 
             fileName,
             onProgress
           );
-          console.log('✅ Imagen individual subida exitosamente:', azureUrl);
           return azureUrl;
         } catch (error) {
           console.warn('❌ No se pudo subir imagen a Azure, usando fallback a base64:', images, error);
@@ -349,7 +335,6 @@ export const useActivityForm = ({
   };
 
   const processFormData = async (formData: any): Promise<DocumentFormData> => {
-    console.log('🔄 Iniciando processFormData...');
     const startedAt = new Date().toISOString();
     
     // Obtener ubicación si el formulario la requiere
@@ -373,14 +358,7 @@ export const useActivityForm = ({
     }
 
     // Separar datos especiales del resto del formulario
-    const { _signatures, _photos, _locations, _files, _qrCodes, _enrichedResponses, ...cleanFormData } = formData;
-    
-    console.log('📸 Datos de fotos:', _photos);
-    console.log('✍️ Datos de firmas:', _signatures);
-    console.log('📍 Datos de ubicación:', _locations);
-    console.log('📁 Datos de archivos:', _files);
-    console.log('📱 Datos de QR:', _qrCodes);
-    console.log('🧹 Datos limpios del formulario:', cleanFormData);
+    const { _signatures, _photos, _locations, _files, _qrCodes, _enrichedResponses, _pendingSignatures, _completedSignatures, ...cleanFormData } = formData;
     
     // Limpiar datos de campos de diseño que puedan haberse incluido
     const cleanedFormData = { ...cleanFormData };
@@ -388,13 +366,11 @@ export const useActivityForm = ({
       for (const field of template.structure) {
         if (field.type === 'sectionHeader' || field.type === 'paragraph' || field.type === 'spacer' || field.type === 'info_text') {
           if (cleanedFormData.hasOwnProperty(field.id)) {
-            console.log(`🧹 Removiendo campo de diseño ${field.id} (${field.type}) de los datos`);
             delete cleanedFormData[field.id];
           }
         }
       }
     }
-    console.log('🧹 Datos limpios después de remover campos de diseño:', cleanedFormData);
 
     // Procesar imágenes y firmas para convertir URIs a base64
     const processedPhotos: Record<string, any> = {};
@@ -403,15 +379,10 @@ export const useActivityForm = ({
     // Filtrar solo campos de entrada reales (no campos de diseño)
     const processedFormData: Record<string, any> = {};
     if (template?.structure) {
-      console.log('🔍 Filtrando campos del template...');
       for (const field of template.structure) {
-        console.log(`🔍 Campo: ${field.id} (tipo: ${field.type})`);
-        // Solo incluir campos que no sean elementos de diseño
         if (field.type !== 'sectionHeader' && field.type !== 'paragraph' && field.type !== 'spacer' && field.type !== 'info_text') {
           const fieldValue = cleanedFormData[field.id];
-          console.log(`✅ Incluyendo campo ${field.id}:`, fieldValue);
           if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
-            // Limpiar strings de emojis y caracteres especiales
             if (typeof fieldValue === 'string') {
               processedFormData[field.id] = cleanString(fieldValue);
             } else {
@@ -428,16 +399,11 @@ export const useActivityForm = ({
       Object.assign(processedFormData, cleanedFormData);
     }
     
-    console.log('📊 Datos procesados finales:', processedFormData);
-
     // Procesar fotos
     if (_photos && Object.keys(_photos).length > 0) {
-      console.log('🔄 Procesando fotos...');
       for (const [fieldName, photos] of Object.entries(_photos)) {
-        console.log(`📸 Procesando fotos para campo: ${fieldName}`, photos);
         try {
           processedPhotos[fieldName] = await processImages(photos);
-          console.log(`✅ Fotos procesadas para ${fieldName}:`, processedPhotos[fieldName]);
         } catch (error) {
           console.error(`❌ Error procesando fotos para ${fieldName}:`, error);
           processedPhotos[fieldName] = null;
@@ -449,12 +415,9 @@ export const useActivityForm = ({
 
     // Procesar firmas
     if (_signatures && Object.keys(_signatures).length > 0) {
-      console.log('🔄 Procesando firmas...');
       for (const [fieldName, signature] of Object.entries(_signatures)) {
-        console.log(`✍️ Procesando firma para campo: ${fieldName}`, signature);
         try {
           processedSignatures[fieldName] = await processImages(signature);
-          console.log(`✅ Firma procesada para ${fieldName}:`, processedSignatures[fieldName]);
         } catch (error) {
           console.error(`❌ Error procesando firma para ${fieldName}:`, error);
           processedSignatures[fieldName] = null;
@@ -466,26 +429,17 @@ export const useActivityForm = ({
 
     // Procesar campos del formulario que puedan contener imágenes
      if (template?.structure) {
-       console.log('🔄 Procesando campos del formulario...');
-       console.log('📊 Total de campos en template:', template.structure.length);
-       
        for (const field of template.structure) {
-         console.log(`🔍 Revisando campo: ${field.id} (tipo: ${field.type})`);
-         
-         // Solo procesar campos que realmente sean imágenes o firmas, no elementos de diseño
          if (field.type === 'photo' || field.type === 'signature') {
            const fieldValue = processedFormData[field.id];
            if (fieldValue) {
-             // Validación adicional: asegurarse de que el valor parezca ser una imagen
              const isValidImageData = 
                (typeof fieldValue === 'string' && (fieldValue.startsWith('file://') || fieldValue.startsWith('content://') || fieldValue.startsWith('data:image'))) ||
                (Array.isArray(fieldValue) && fieldValue.length > 0);
              
              if (isValidImageData) {
-               console.log(`🔄 Procesando campo ${field.id} (${field.type}):`, typeof fieldValue, fieldValue);
                try {
                  processedFormData[field.id] = await processImages(fieldValue);
-                 console.log(`✅ Campo ${field.id} procesado exitosamente`);
                } catch (error) {
                  console.error(`❌ Error procesando campo ${field.id}:`, error);
                  processedFormData[field.id] = null;
@@ -529,6 +483,8 @@ export const useActivityForm = ({
         templateId: template?.id,
         templateName: template?.name,
         enrichedResponses: _enrichedResponses, // Estructura enriquecida para revisiones
+        // Nota: Las firmas se guardan como referencias en signatureIds en lugar de objetos completos
+        // _pendingSignatures y _completedSignatures se omiten para evitar duplicación
       },
       // Estructura enriquecida en campos separados para el backend
       templateSnapshot: template ? {
@@ -553,14 +509,8 @@ export const useActivityForm = ({
       documentData.locationData = locationData;
     }
 
-    console.log('✅ processFormData completado exitosamente');
-    console.log('📄 Documento final:', JSON.stringify(documentData, null, 2));
-    
-    // Validación final: verificar que no haya campos de diseño en los datos procesados
-    console.log('🔍 Validación final - Campos en processedFormData:');
     for (const [fieldId, value] of Object.entries(processedFormData)) {
       const field = template?.structure?.find(f => f.id === fieldId);
-      console.log(`  ${fieldId}: ${field?.type || 'unknown'} = ${typeof value} (${value})`);
     }
 
     return documentData;
@@ -571,23 +521,111 @@ export const useActivityForm = ({
       setIsSubmitting(true);
       setError(null);
 
-      console.log('🔍 Iniciando procesamiento de formulario...');
-      console.log('📋 Datos del formulario:', JSON.stringify(formData, null, 2));
+      // Verificar si el formulario tiene campos de tipo 'multiple_signature'
+      const hasMultipleSignatureFields = template?.structure?.some((field: any) => field.type === 'multiple_signature');
+      let signatureIds: number[] = [];
       
+      if (hasMultipleSignatureFields && (formData._pendingSignatures?.length > 0 || formData._completedSignatures?.length > 0) && canMakeRequests) {
+        try {
+          const documentTitle = template?.name || 'Documento';
+          
+          // Crear las firmas digitales SIN documentId (se asignará después)
+          const { createSignaturesForDocument } = await import('../components/forms/FormRenderer');
+          const signaturesResult = await createSignaturesForDocument(null, documentTitle, formData._pendingSignatures, formData._completedSignatures);
+          
+          // Extraer los IDs de las firmas creadas
+          if (signaturesResult && signaturesResult.signatureIds) {
+            signatureIds = signaturesResult.signatureIds;
+          }
+          
+        } catch (signatureError: any) {
+          console.error('❌ Error creando firmas digitales:', signatureError);
+          
+          // Si es un error de autenticación, mostrar un mensaje específico
+          if (signatureError?.message?.includes('Sesión expirada') || signatureError?.status === 401) {
+            console.warn('⚠️ Error de autenticación al crear firmas');
+            Alert.alert(
+              'Error de autenticación',
+              'Hubo un problema con la autenticación al crear las firmas digitales. Por favor, inicia sesión nuevamente.',
+              [{ text: 'Entendido' }]
+            );
+            return;
+          }
+          // Fallar el proceso si no se pueden crear las firmas
+          throw signatureError;
+        }
+      }
+      
+      // PASO 2: Procesar datos del documento
       const documentData = await processFormData(formData);
-      
-      console.log('📤 Documento procesado, preparando para envío...');
       
       // Añadir tiempo de completado
       documentData.metadata = {
         ...documentData.metadata,
         completedAt: new Date().toISOString(),
       };
-
-      console.log('📤 Enviando documento al backend...');
       
-      // Usar sistema offline que maneja automáticamente la conectividad
-      const result = await offlineDocumentsApi.createFromActivity(documentData);
+      // PASO 3: Agregar referencias de firmas al documento
+      const documentDataWithSignatures = {
+        ...documentData,
+        ...(signatureIds.length > 0 && { signatureIds })
+      };
+
+      // PASO 4: Crear el documento con las referencias de firmas
+      const result = await offlineDocumentsApi.createFromActivity(documentDataWithSignatures);
+      
+      if (signatureIds.length > 0 && canMakeRequests) {
+        try {
+          let documentId = null;
+          
+          // Extraer documentId de la respuesta
+          if (result?.id) {
+            if (typeof result.id === 'string' && result.id.startsWith('offline_')) {
+              console.log('📱 ID offline detectado en result.id, omitiendo actualización de firmas');
+            } else {
+              documentId = typeof result.id === 'string' ? parseInt(result.id, 10) : result.id;
+              console.log('📋 DocumentId extraído de result.id:', documentId);
+            }
+          } else if (result?.data?.id) {
+            if (typeof result.data.id === 'string' && result.data.id.startsWith('offline_')) {
+              console.log('📱 ID offline detectado en result.data.id, omitiendo actualización de firmas');
+            } else {
+              documentId = typeof result.data.id === 'string' ? parseInt(result.data.id, 10) : result.data.id;
+              console.log('📋 DocumentId extraído de result.data.id:', documentId);
+            }
+          } else {
+            console.log('⚠️ No se pudo extraer documentId de la respuesta');
+          }
+          
+          // Actualizar las firmas con el documentId
+          if (documentId && !isNaN(documentId) && documentId > 0) {
+            const { updateSignaturesWithDocumentId } = await import('../components/forms/FormRenderer');
+            await updateSignaturesWithDocumentId(signatureIds, documentId);
+          } else {
+            console.log('❌ DocumentId inválido, no se pueden actualizar las firmas:', documentId);
+          }
+          
+        } catch (updateError: any) {
+          console.error('❌ Error actualizando firmas con documentId:', updateError);
+          console.error('❌ Stack trace:', updateError?.stack);
+          // No fallar todo el proceso por este error, pero mostrar alerta
+          Alert.alert(
+            'Advertencia',
+            'El documento se creó correctamente, pero hubo un problema actualizando las referencias de firmas. La trazabilidad podría verse afectada.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        console.log('❌ CONDICIÓN NO CUMPLIDA: No se actualizarán las firmas');
+        console.log('  - Razón detallada:');
+        if (signatureIds.length === 0) {
+          console.log('    ❌ signatureIds.length === 0 (No hay firmas para actualizar)');
+        }
+        if (!canMakeRequests) {
+          console.log('    ❌ canMakeRequests === false (Sin conexión)');
+          console.log('    📱 Detalles de conectividad:', { isOnline, canMakeRequests });
+        }
+      }
       
       // Limpiar borrador si existe
       await offlineStorage.deleteDraftForm(activityId);
@@ -615,8 +653,6 @@ export const useActivityForm = ({
         }]
       );
 
-      console.log('📄 Documento procesado:', result);
-      
     } catch (error) {
       console.error('❌ Error enviando formulario:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
@@ -655,8 +691,6 @@ export const useActivityForm = ({
         [{ text: 'OK' }]
       );
 
-      console.log('📝 Borrador guardado para actividad:', activityId);
-      
     } catch (error) {
       console.error('❌ Error guardando borrador:', error);
       Alert.alert(

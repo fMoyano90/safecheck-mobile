@@ -81,6 +81,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="pending-signatures"
+        options={{
+          title: 'Firmas',
+          tabBarIcon: ({ color }) => <TabBarIcon name="edit" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="scheduled"
         options={{
           title: 'Programadas',
