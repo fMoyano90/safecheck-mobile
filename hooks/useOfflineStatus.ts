@@ -63,11 +63,11 @@ export const useOfflineStatus = (
     NetInfo.fetch().then(handleConnectivityChange);
 
     // Intervalo para verificaciones periódicas
-    if (finalConfig.connectionCheckInterval > 0) {
+    if (finalConfig.connectionCheckInterval && finalConfig.connectionCheckInterval > 0) {
       intervalRef.current = setInterval(() => {
         NetInfo.fetch().then(handleConnectivityChange);
         updateOfflineDuration();
-      }, finalConfig.connectionCheckInterval);
+      }, finalConfig.connectionCheckInterval) as any;
     }
 
     return () => {
@@ -96,7 +96,7 @@ export const useOfflineStatus = (
     const isInMiningArea = await checkMiningAreaLocation();
 
     const newStatus: OfflineStatus = {
-      isOnline: isConnected,
+      isOnline: isConnected ?? false,
       hasStrongConnection: connectionQuality.isStrong,
       hasWeakConnection: connectionQuality.isWeak,
       connectionType: state.type,
@@ -107,7 +107,7 @@ export const useOfflineStatus = (
       offlineDuration: calculateOfflineDuration(),
       canSyncCriticalData: connectionQuality.canSyncCritical,
       shouldUseOfflineMode: shouldUseOfflineMode(
-        isConnected,
+        isConnected ?? false,
         connectionQuality,
         isInMiningArea
       ),

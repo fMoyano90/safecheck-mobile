@@ -37,7 +37,6 @@ class SyncManager {
     
     const pendingItems = await offlineStorage.getSyncQueue();
     if (pendingItems.length > 0) {
-      console.log(`🔄 ${pendingItems.length} elementos pendientes de sincronización`);
       
       if (networkManager.isOnline()) {
         this.startPeriodicSync();
@@ -46,13 +45,11 @@ class SyncManager {
   }
 
   private handleConnectionRestored = async () => {
-    console.log('🟢 Conexión restaurada - iniciando sincronización');
     await this.syncNow();
     this.startPeriodicSync();
   };
 
   private handleConnectionLost = () => {
-    console.log('🔴 Conexión perdida - pausando sincronización');
     this.stopPeriodicSync();
   };
 
@@ -80,7 +77,6 @@ class SyncManager {
         return { success: true, syncedItems: 0, failedItems: 0, errors: [] };
       }
 
-      console.log(`🔄 Sincronizando ${eligibleItems.length} elementos...`);
       
       const sortedItems = this.sortQueueByPriority(eligibleItems);
       const batches = this.createBatches(sortedItems, this.config.batchSize);
@@ -107,8 +103,6 @@ class SyncManager {
               attempts: item.attempts + 1,
               lastError: error
             });
-            
-            console.log(`❌ Error sincronizando ${item.type}: ${error}`);
           }
         }
         
@@ -126,8 +120,6 @@ class SyncManager {
       }
 
       await offlineStorage.setLastSyncTime(new Date().toISOString());
-      
-      console.log(`✅ Sincronización completada: ${syncedItems} éxitos, ${failedItems} fallos`);
       
       return {
         success: syncedItems > 0 || failedItems === 0,

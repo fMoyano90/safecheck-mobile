@@ -64,8 +64,6 @@ export default function DocumentContentRenderer({ documentContent, documentField
   const [selectedImage, setSelectedImage] = useState<{ uri: string; title: string } | null>(null);
 
   // Debug: Log para ver qué datos están llegando
-  console.log('DocumentContentRenderer - documentContent:', JSON.stringify(documentContent, null, 2));
-  console.log('DocumentContentRenderer - documentFields:', JSON.stringify(documentFields, null, 2));
 
   const formatDate = (dateString: string) => {
     try {

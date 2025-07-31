@@ -6,7 +6,6 @@ import {
   documentsApi, 
   type DocumentFormData, 
   type ActivityTemplate, 
-  type DocumentResponse 
 } from '@/lib/api';
 import { 
   offlineDocumentsApi, 
@@ -103,7 +102,6 @@ export const useActivityForm = ({
       // Cargar borrador si existe
       const draftData = await offlineStorage.getDraftForm(activityId);
       if (draftData) {
-        console.log('📝 Borrador encontrado para actividad', activityId);
         // TODO: Aquí podrías emitir un evento o callback para cargar el borrador en el formulario
       }
       
@@ -390,12 +388,10 @@ export const useActivityForm = ({
             }
           }
         } else {
-          console.log(`❌ Excluyendo campo de diseño ${field.id} (tipo: ${field.type})`);
         }
       }
     } else {
       // Fallback: usar todos los datos si no hay template
-      console.log('⚠️ No hay template, usando todos los datos');
       Object.assign(processedFormData, cleanedFormData);
     }
     
@@ -409,8 +405,6 @@ export const useActivityForm = ({
           processedPhotos[fieldName] = null;
         }
       }
-    } else {
-      console.log('📸 No hay fotos para procesar');
     }
 
     // Procesar firmas
@@ -423,8 +417,6 @@ export const useActivityForm = ({
           processedSignatures[fieldName] = null;
         }
       }
-    } else {
-      console.log('✍️ No hay firmas para procesar');
     }
 
     // Procesar campos del formulario que puedan contener imágenes
@@ -444,20 +436,11 @@ export const useActivityForm = ({
                  console.error(`❌ Error procesando campo ${field.id}:`, error);
                  processedFormData[field.id] = null;
                }
-             } else {
-               console.log(`⏭️ Campo ${field.id} no contiene datos de imagen válidos, saltando:`, fieldValue);
              }
-           } else {
-             console.log(`⏭️ Campo ${field.id} no tiene valor, saltando`);
            }
-         } else {
-           console.log(`⏭️ Campo ${field.id} es de tipo ${field.type}, saltando procesamiento de imagen`);
          }
        }
-     } else {
-       console.log('⚠️ No hay template para procesar campos del formulario');
      }
-
     // Contar campos de entrada reales (excluyendo campos de diseño)
     const inputFieldsCount = template?.structure ? 
       template.structure.filter(field => 
@@ -578,31 +561,11 @@ export const useActivityForm = ({
         try {
           let documentId = null;
           
-          // Extraer documentId de la respuesta
-          if (result?.id) {
-            if (typeof result.id === 'string' && result.id.startsWith('offline_')) {
-              console.log('📱 ID offline detectado en result.id, omitiendo actualización de firmas');
-            } else {
-              documentId = typeof result.id === 'string' ? parseInt(result.id, 10) : result.id;
-              console.log('📋 DocumentId extraído de result.id:', documentId);
-            }
-          } else if (result?.data?.id) {
-            if (typeof result.data.id === 'string' && result.data.id.startsWith('offline_')) {
-              console.log('📱 ID offline detectado en result.data.id, omitiendo actualización de firmas');
-            } else {
-              documentId = typeof result.data.id === 'string' ? parseInt(result.data.id, 10) : result.data.id;
-              console.log('📋 DocumentId extraído de result.data.id:', documentId);
-            }
-          } else {
-            console.log('⚠️ No se pudo extraer documentId de la respuesta');
-          }
           
           // Actualizar las firmas con el documentId
           if (documentId && !isNaN(documentId) && documentId > 0) {
             const { updateSignaturesWithDocumentId } = await import('../components/forms/FormRenderer');
             await updateSignaturesWithDocumentId(signatureIds, documentId);
-          } else {
-            console.log('❌ DocumentId inválido, no se pueden actualizar las firmas:', documentId);
           }
           
         } catch (updateError: any) {
@@ -614,16 +577,6 @@ export const useActivityForm = ({
             'El documento se creó correctamente, pero hubo un problema actualizando las referencias de firmas. La trazabilidad podría verse afectada.',
             [{ text: 'OK' }]
           );
-        }
-      } else {
-        console.log('❌ CONDICIÓN NO CUMPLIDA: No se actualizarán las firmas');
-        console.log('  - Razón detallada:');
-        if (signatureIds.length === 0) {
-          console.log('    ❌ signatureIds.length === 0 (No hay firmas para actualizar)');
-        }
-        if (!canMakeRequests) {
-          console.log('    ❌ canMakeRequests === false (Sin conexión)');
-          console.log('    📱 Detalles de conectividad:', { isOnline, canMakeRequests });
         }
       }
       

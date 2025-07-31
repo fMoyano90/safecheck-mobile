@@ -49,7 +49,6 @@ class DeviceTokenService {
       
       if (!projectId || projectId === 'your-project-id-here') {
         console.error('❌ ProjectId no configurado. Por favor configura el projectId en app.json');
-        console.log('💡 Solución: Ejecuta "npx eas init" para configurar el proyecto');
         return false;
       }
       
@@ -58,7 +57,6 @@ class DeviceTokenService {
       });
 
       this.token = tokenData.data;
-      console.log('📱 Token de dispositivo obtenido:', this.token?.substring(0, 20) + '...');
       
       return true;
     } catch (error) {
@@ -78,7 +76,6 @@ class DeviceTokenService {
       }
 
       if (this.isRegistered) {
-        console.log('✅ Token ya registrado');
         return true;
       }
 
@@ -92,7 +89,6 @@ class DeviceTokenService {
       
       if (response.data.success) {
         this.isRegistered = true;
-        console.log('✅ Token registrado exitosamente:', response.data.message);
         return true;
       } else {
         console.error('❌ Error registrando token:', response.data.message);
@@ -123,7 +119,6 @@ class DeviceTokenService {
 
       if (response.data.success) {
         this.isRegistered = false;
-        console.log('✅ Token desregistrado exitosamente');
         return true;
       } else {
         console.error('❌ Error desregistrando token:', response.data.message);
@@ -143,7 +138,6 @@ class DeviceTokenService {
       const response = await apiClient.post('/device-tokens/test');
       
       if (response.data.success) {
-        console.log('✅ Notificación de prueba enviada:', response.data.message);
         return true;
       } else {
         console.error('❌ Error enviando notificación de prueba:', response.data.message);
@@ -174,20 +168,17 @@ class DeviceTokenService {
   setupNotificationListeners() {
     // Listener para notificaciones recibidas mientras la app está en primer plano
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('📱 Notificación recibida:', notification);
       // Aquí puedes manejar la notificación recibida
       // Por ejemplo, actualizar el estado de la aplicación
     });
 
     // Listener para cuando el usuario toca una notificación
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('👆 Notificación tocada:', response);
       
       // Manejar la navegación basada en los datos de la notificación
       const data = response.notification.request.content.data;
       if (data?.actionUrl) {
         // Aquí puedes navegar a la pantalla correspondiente
-        console.log('🔗 Navegar a:', data.actionUrl);
       }
     });
 

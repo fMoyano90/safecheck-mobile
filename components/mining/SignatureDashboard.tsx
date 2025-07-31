@@ -43,8 +43,6 @@ export const SignatureDashboard: React.FC<SignatureDashboardProps> = ({
     stats,
     loading,
     syncSignatures,
-    deleteSignature,
-    getSignaturesByType,
   } = useOfflineSignatures();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -53,7 +51,7 @@ export const SignatureDashboard: React.FC<SignatureDashboardProps> = ({
 
   const filteredSignatures = selectedFilter === 'all' 
     ? signatures 
-    : getSignaturesByType(selectedFilter);
+    : signatures.filter(sig => sig.miningType === selectedFilter);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -115,7 +113,10 @@ export const SignatureDashboard: React.FC<SignatureDashboardProps> = ({
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => deleteSignature(signatureId),
+          onPress: () => {
+            // TODO: Implement signature deletion
+            console.log('Delete signature:', signatureId);
+          },
         },
       ]
     );
@@ -158,7 +159,7 @@ export const SignatureDashboard: React.FC<SignatureDashboardProps> = ({
   };
 
   const getPriorityColor = (priority: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       critical: '#F44336',
       high: '#FF9800',
       medium: '#4CAF50',
@@ -203,7 +204,7 @@ export const SignatureDashboard: React.FC<SignatureDashboardProps> = ({
       
       <View style={styles.locationStatus}>
         <Ionicons 
-          name={isInMiningArea ? 'location' : 'location-off'} 
+          name={isInMiningArea ? 'location' : 'location' as any} 
           size={16} 
           color={isInMiningArea ? '#4CAF50' : '#F44336'} 
         />

@@ -63,7 +63,6 @@ const getClientIpAddress = async (): Promise<string> => {
 export const updateSignaturesWithDocumentId = async (signatureIds: number[], documentId: number) => {
   
   if (!signatureIds || signatureIds.length === 0) {
-    console.log('❌ No hay IDs de firmas para actualizar');
     return;
   }
   
@@ -1527,11 +1526,9 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                           <TouchableOpacity
                             style={styles.multiSignatureButton}
                             onPress={() => {
-                              console.log('Reiniciando selección de usuarios');
                               try {
                                 setSelectedUsers(() => []);
                                 setSignatureRecords(() => []);
-                                console.log('Reinicio completado');
                               } catch (error) {
                                 console.error('Error al reiniciar:', error);
                               }
@@ -1574,7 +1571,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       <PendingSignatures
                         pendingSignatures={allSignaturesForDisplay}
                         onSignatureComplete={async (userId, signature) => {
-                          console.log('Signature completed for user:', userId, signature);
                           // Obtener IP del cliente
                           const clientIp = await getClientIpAddress();
                           // Update the signature status
@@ -3492,7 +3488,6 @@ export const createSignaturesForDocument = async (documentId: number | string | 
   if (documentId) {
     // Verificar si es un ID offline (string que empieza con 'offline_')
     if (typeof documentId === 'string' && documentId.startsWith('offline_')) {
-      console.log('📱 ID offline detectado, no se pueden crear firmas digitales hasta que se sincronice');
       return;
     }
 
@@ -3511,7 +3506,6 @@ export const createSignaturesForDocument = async (documentId: number | string | 
   }
 
   if (!signers || signers.length === 0) {
-    console.log('❌ No hay firmantes para crear solicitudes');
     return;
   }
 
