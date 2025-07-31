@@ -162,13 +162,8 @@ export default function RecurringActivitiesScreen() {
         },
       };
 
-      console.log('📤 Submission object:', JSON.stringify(submission, null, 2));
-
       // Enviar el formulario y obtener el resultado con el ID del documento
       const result = await submitForm(submission);
-      console.log('📋 Resultado completo del envío:', JSON.stringify(result, null, 2));
-      
-      console.log('✅ Formulario enviado exitosamente');
       
       Alert.alert(
         'Éxito',

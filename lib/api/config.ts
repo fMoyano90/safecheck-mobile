@@ -104,15 +104,6 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
       ...options.headers,
     },
   };
-  
-  // Log para debug de firmas múltiples
-  if (endpoint.includes('digital-signatures/multiple')) {
-    console.log('🌐 apiRequest - URL:', url);
-    console.log('🌐 apiRequest - Method:', config.method);
-    console.log('🌐 apiRequest - Headers:', config.headers);
-    console.log('🌐 apiRequest - Body:', config.body);
-    console.log('🌐 apiRequest - Body type:', typeof config.body);
-  }
 
   try {
     const response = await fetch(url, config);

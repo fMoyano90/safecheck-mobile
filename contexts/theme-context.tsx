@@ -51,7 +51,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
       setThemeModeState(mode);
-      console.log('🎨 Theme mode changed to:', mode);
     } catch (error) {
       console.error('Error saving theme mode:', error);
     }

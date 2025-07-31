@@ -165,10 +165,6 @@ export default function ScheduledActivitiesScreen() {
       // Cargar todas las actividades del usuario
       const userActivities = await activitiesApi.getMyActivities();
       
-      console.log('🔍 Raw userActivities response:', userActivities);
-      console.log('🔍 Type of userActivities:', typeof userActivities);
-      console.log('🔍 Is array:', Array.isArray(userActivities));
-      
       // Verificar que userActivities sea un array
       if (!Array.isArray(userActivities)) {
         console.error('❌ userActivities is not an array:', userActivities);

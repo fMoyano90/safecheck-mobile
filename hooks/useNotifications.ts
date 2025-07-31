@@ -50,12 +50,6 @@ export const useNotifications = (): UseNotificationsReturn => {
         index === self.findIndex(n => n.id === notification.id)
       );
       
-      // Log temporal para debugging
-      if (localNotifications.length !== uniqueNotifications.length) {
-        console.log(`🔍 Duplicados encontrados: ${localNotifications.length - uniqueNotifications.length}`);
-        console.log('IDs duplicados:', localNotifications.map(n => n.id).filter((id, index, self) => self.indexOf(id) !== index));
-      }
-      
       setNotifications(uniqueNotifications);
     } catch (error) {
       console.error("❌ Error cargando notificaciones locales:", error);
