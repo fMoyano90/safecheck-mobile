@@ -30,7 +30,6 @@ class NetworkManager extends EventEmitter {
     NetInfo.addEventListener(this.handleNetworkChange);
     
     this.initialized = true;
-    console.log('🌐 NetworkManager inicializado:', this.currentState);
   }
 
   private handleNetworkChange = (state: NetInfoState) => {
@@ -62,12 +61,6 @@ class NetworkManager extends EventEmitter {
   };
 
   private updateNetworkState(state: NetInfoState): void {
-    console.log('🔍 NetInfo state:', {
-      isConnected: state.isConnected,
-      isInternetReachable: state.isInternetReachable,
-      type: state.type,
-      details: state.details
-    });
     
     const hasStrongConnection = this.evaluateConnectionQuality(state);
     
@@ -78,8 +71,6 @@ class NetworkManager extends EventEmitter {
       type: state.type || 'none',
       hasStrongConnection,
     };
-    
-    console.log('🔍 Updated NetworkState:', this.currentState);
   }
 
   private evaluateConnectionQuality(state: NetInfoState): boolean {

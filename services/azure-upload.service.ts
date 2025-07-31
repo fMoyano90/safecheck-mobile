@@ -139,18 +139,14 @@ export class AzureUploadService {
     onProgress?: (progress: UploadProgress) => void,
   ): Promise<string> {
     try {
-      console.log('🔄 Iniciando upload de imagen:', fileName);
 
       // 1. Comprimir la imagen
-      console.log('📐 Comprimiendo imagen...');
       const compressedUri = await this.compressImage(fileUri);
 
       // 2. Generar SAS token
-      console.log('🔑 Generando SAS token...');
       const sasToken = await this.generateSasToken(fileName, 'image/jpeg');
 
       // 3. Subir a Azure Storage
-      console.log('☁️ Subiendo a Azure Storage...');
       await this.uploadToAzure(
         sasToken.uploadUrl,
         compressedUri,
@@ -158,7 +154,6 @@ export class AzureUploadService {
         onProgress,
       );
 
-      console.log('✅ Upload completado:', sasToken.finalUrl);
       return sasToken.finalUrl;
     } catch (error) {
       console.error('❌ Error en upload completo:', error);
@@ -174,7 +169,6 @@ export class AzureUploadService {
     onProgress?: (index: number, progress: UploadProgress) => void,
   ): Promise<string[]> {
     try {
-      console.log(`🔄 Subiendo ${fileUris.length} imágenes...`);
 
       const uploadPromises = fileUris.map(async (uri, index) => {
         const fileName = `image_${Date.now()}_${index}.jpg`;
@@ -186,7 +180,6 @@ export class AzureUploadService {
       });
 
       const results = await Promise.all(uploadPromises);
-      console.log('✅ Todas las imágenes subidas exitosamente');
       return results;
     } catch (error) {
       console.error('❌ Error subiendo múltiples imágenes:', error);

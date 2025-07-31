@@ -366,7 +366,6 @@ class OfflineApiManager {
   }
 
   async createDocument(documentData: any): Promise<any> {
-    console.log('📤 createDocument llamado con:', typeof documentData);
     
     // Guardar documento localmente
     const offlineDoc = {
@@ -380,10 +379,8 @@ class OfflineApiManager {
     
     await offlineStorage.saveDocument(offlineDoc);
 
-    console.log('📤 Intentando JSON.stringify del documento...');
     try {
       const jsonString = JSON.stringify(documentData);
-      console.log('✅ JSON.stringify exitoso, longitud:', jsonString.length);
       
       return this.request<any>('/api/v1/documents/worker', {
         method: 'POST',

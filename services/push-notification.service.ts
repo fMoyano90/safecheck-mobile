@@ -40,6 +40,8 @@ class PushNotificationService {
           shouldShowAlert: true,
           shouldPlaySound: data.priority === 'critical' || data.priority === 'high',
           shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
         };
       },
     });
@@ -82,7 +84,6 @@ class PushNotificationService {
       // Registrar token en el backend
       await this.registerDeviceToken(this.expoPushToken);
 
-      console.log('✅ Notificaciones push inicializadas:', this.expoPushToken);
       return this.expoPushToken;
     } catch (error) {
       console.error('❌ Error inicializando notificaciones push:', error);
@@ -102,7 +103,6 @@ class PushNotificationService {
         }),
       });
 
-      console.log('✅ Token de dispositivo registrado en el backend');
     } catch (error) {
       console.error('❌ Error registrando token de dispositivo:', error);
     }
@@ -119,7 +119,6 @@ class PushNotificationService {
         }),
       });
 
-      console.log('✅ Token de dispositivo desregistrado del backend');
     } catch (error) {
       console.error('❌ Error desregistrando token de dispositivo:', error);
     }
@@ -132,7 +131,6 @@ class PushNotificationService {
         body: JSON.stringify(preferences),
       });
 
-      console.log('✅ Preferencias de notificación actualizadas');
     } catch (error) {
       console.error('❌ Error actualizando preferencias:', error);
     }
@@ -183,7 +181,6 @@ class PushNotificationService {
         break;
       
       default:
-        console.log('Tipo de notificación no manejado:', data.type);
     }
   }
 
@@ -203,11 +200,11 @@ class PushNotificationService {
           sound: data.priority === 'critical' ? 'default' : undefined,
         },
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: triggerDate,
         },
       });
 
-      console.log('✅ Notificación local programada:', identifier);
       return identifier;
     } catch (error) {
       console.error('❌ Error programando notificación local:', error);
@@ -219,7 +216,6 @@ class PushNotificationService {
   async cancelLocalNotification(identifier: string): Promise<void> {
     try {
       await Notifications.cancelScheduledNotificationAsync(identifier);
-      console.log('✅ Notificación local cancelada:', identifier);
     } catch (error) {
       console.error('❌ Error cancelando notificación local:', error);
     }
@@ -229,7 +225,6 @@ class PushNotificationService {
   async clearAllNotifications(): Promise<void> {
     try {
       await Notifications.dismissAllNotificationsAsync();
-      console.log('✅ Todas las notificaciones limpiadas');
     } catch (error) {
       console.error('❌ Error limpiando notificaciones:', error);
     }

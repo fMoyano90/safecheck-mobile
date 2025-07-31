@@ -1,7 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { networkManager } from './network-manager';
 import { syncManager } from './sync-manager';
-import { offlineStorage } from './storage';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 
@@ -138,12 +136,6 @@ class SignatureOfflineManager {
       // Añadir a cola de sincronización
       await this.addToSyncQueue(offlineSignature);
       
-      console.log('📝 Firma offline creada:', {
-        id: offlineSignature.id,
-        type: miningType,
-        priority: offlineSignature.priority,
-      });
-      
       return offlineSignature;
     } catch (error) {
       console.error('❌ Error creando firma offline:', error);
@@ -208,7 +200,7 @@ class SignatureOfflineManager {
     } catch (error) {
       return {
         isValid: false,
-        errors: [`Error de validación: ${error.message}`],
+        errors: [`Error de validación: ${error instanceof Error ? error.message : 'Unknown error'}`],
         warnings: [],
       };
     }
@@ -243,8 +235,6 @@ class SignatureOfflineManager {
     let failed = 0;
     const errors: string[] = [];
 
-    console.log(`🔄 Sincronizando ${pendingSignatures.length} firmas pendientes`);
-
     // Procesar firmas críticas primero
     const critical = pendingSignatures.filter(s => s.priority === 'critical');
     const others = pendingSignatures.filter(s => s.priority !== 'critical');
@@ -255,10 +245,9 @@ class SignatureOfflineManager {
       try {
         await this.syncSingleSignature(signature);
         synced++;
-        console.log(`✅ Firma sincronizada: ${signature.id}`);
       } catch (error) {
         failed++;
-        errors.push(`${signature.id}: ${error.message}`);
+        errors.push(`${signature.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         console.error(`❌ Error sincronizando firma ${signature.id}:`, error);
         
         // Incrementar intentos
@@ -285,7 +274,6 @@ class SignatureOfflineManager {
       await this.updateOfflineSignature(signature);
     }
     
-    console.log(`🧹 ${expired.length} firmas marcadas como expiradas`);
     return expired.length;
   }
 
@@ -332,7 +320,7 @@ class SignatureOfflineManager {
       return {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
+        accuracy: location.coords.accuracy ?? undefined,
       };
     } catch (error) {
       console.warn('⚠️ No se pudo obtener ubicación:', error);
@@ -394,7 +382,7 @@ class SignatureOfflineManager {
     }
   }
 
-  private async getAllOfflineSignatures(): Promise<OfflineSignature[]> {
+  public async getAllOfflineSignatures(): Promise<OfflineSignature[]> {
     try {
       const data = await AsyncStorage.getItem(this.STORAGE_KEY);
       return data ? JSON.parse(data) : [];
@@ -406,11 +394,11 @@ class SignatureOfflineManager {
 
   private async addToSyncQueue(signature: OfflineSignature): Promise<void> {
     await syncManager.addToQueue({
-      type: 'signature_complete',
+      type: 'document_create',
       endpoint: '/api/v1/digital-signatures/offline-complete',
       method: 'POST',
       data: signature,
-      priority: signature.priority,
+      priority: signature.priority === 'critical' ? 'high' : signature.priority,
       attempts: 0,
       maxAttempts: signature.priority === 'critical' ? 10 : 5,
     });
